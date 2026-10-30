@@ -5018,9 +5018,8 @@ build_utoa_fn (void)
   _3 = (size_t) _2;
   */
   gsi = gsi_start_bb (bb6);
-  // TODO am I using the right type here:?
   tree written_1 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-      POINTER_DIFF_EXPR, long_integer_type_node, str_5, str_1);
+      POINTER_DIFF_EXPR, ptrdiff_type_node, str_5, str_1);
   tree written_2 = gimple_convert (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
       size_type_node, written_1);
 
@@ -5320,9 +5319,8 @@ build_itoa_fn (void)
   _3 = (size_t) _2;
   */
   gsi = gsi_start_bb (bb6);
-  // TODO am I using the right type here:?
   tree written_1 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-      POINTER_DIFF_EXPR, long_integer_type_node, str_5, str_1);
+      POINTER_DIFF_EXPR, ptrdiff_type_node, str_5, str_1);
   tree written_2 = gimple_convert (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
       size_type_node, written_1);
 
