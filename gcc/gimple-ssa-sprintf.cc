@@ -5024,10 +5024,10 @@ build_itoa_fn (void)
     utoa_fn = build_utoa_fn ();
 
   /* Build and setup the function decl.  */
-  /* int __itoa(char *str, int i).  */
+  /* size_t __itoa(char *str, long int i).  */
   tree str_type = build_pointer_type (char_type_node);
   tree fn_type = build_function_type_list (size_type_node, str_type,
-					   integer_type_node, NULL_TREE);
+					   long_integer_type_node, NULL_TREE);
   // TODO what name to use? Is __itoa ok?
   tree fn_name = get_identifier ("__itoa");
   tree fn_decl = build_decl (UNKNOWN_LOCATION, FUNCTION_DECL, fn_name, fn_type);
@@ -5067,10 +5067,10 @@ build_itoa_fn (void)
 
   tree i_param_name = get_identifier ("i");
   tree i_param_decl = build_decl (UNKNOWN_LOCATION, PARM_DECL,
-				    i_param_name, integer_type_node);
+				    i_param_name, long_integer_type_node);
   DECL_ARTIFICIAL (i_param_decl) = 1;
   DECL_NAMELESS (i_param_decl) = 1; // TODO does this make sense?
-  DECL_ARG_TYPE (i_param_decl) = integer_type_node;
+  DECL_ARG_TYPE (i_param_decl) = long_integer_type_node;
   DECL_CONTEXT (i_param_decl) = fn_decl;
   TREE_USED (i_param_decl) = 1;
   TREE_READONLY (i_param_decl) = 0; // TODO do I have to set this explicitly?
@@ -5165,7 +5165,7 @@ build_itoa_fn (void)
   gsi = gsi_start_bb (bb2);
   tree i_1 = get_or_create_ssa_default_def (cfun, i_param_decl);
   gcond *bb2_cond =
-    gimple_build_cond (LT_EXPR, i_1, build_zero_cst (integer_type_node),
+    gimple_build_cond (LT_EXPR, i_1, build_zero_cst (long_integer_type_node),
 	NULL, NULL); // TODO Can I really get away with NULL, NULL?
   gsi_insert_after (&gsi, bb2_cond, GSI_NEW_STMT);
 
@@ -5198,7 +5198,7 @@ build_itoa_fn (void)
   // TODO there's no i_2, I can shift all i_* number down by one
   // TODO also, I could call them u_* since they're unsigned
   tree i_3 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-      ABSU_EXPR, unsigned_type_node, i_1);
+      ABSU_EXPR, long_unsigned_type_node, i_1);
 
   /*
   <bb 5> [local count: 1073741824]:
@@ -5214,18 +5214,18 @@ build_itoa_fn (void)
   /* Just build PHIs.  Add arguments after the gimple_build(...) API gives them
      to us.  */
   tree str_4 = make_ssa_name (str_param_decl);
-  tree i_4 = make_ssa_name (unsigned_type_node);
+  tree i_4 = make_ssa_name (long_unsigned_type_node);
   phi_str = create_phi_node (str_4, bb5);
   phi_i = create_phi_node (i_4, bb5);
 
   gsi = gsi_start_bb (bb5);
   tree i_5 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-      TRUNC_DIV_EXPR, unsigned_type_node, i_4, build_int_cst (unsigned_type_node,
+      TRUNC_DIV_EXPR, long_unsigned_type_node, i_4, build_int_cst (long_unsigned_type_node,
 	10));
   tree str_5 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
       POINTER_PLUS_EXPR, str_type, str_4, build_one_cst (size_type_node));
   gcond *bb5_cond =
-    gimple_build_cond (GT_EXPR, i_4, build_int_cst (unsigned_type_node, 9),
+    gimple_build_cond (GT_EXPR, i_4, build_int_cst (long_unsigned_type_node, 9),
 	NULL, NULL);
   gsi_insert_after (&gsi, bb5_cond, GSI_NEW_STMT);
 
@@ -5265,7 +5265,7 @@ build_itoa_fn (void)
   /* Just build PHIs.  Add arguments after the gimple_build(...) API gives them
      to us.  */
   tree str_6 = make_ssa_name (str_param_decl);
-  tree i_6 = make_ssa_name (unsigned_type_node);
+  tree i_6 = make_ssa_name (long_unsigned_type_node);
   phi_str = create_phi_node (str_6, bb7);
   phi_i = create_phi_node (i_6, bb7);
 
@@ -5273,13 +5273,13 @@ build_itoa_fn (void)
      gimple_build (...) API.  */
   gsi = gsi_start_bb (bb7);
   tree i_7 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-      TRUNC_DIV_EXPR, unsigned_type_node, i_6, build_int_cst (unsigned_type_node,
+      TRUNC_DIV_EXPR, long_unsigned_type_node, i_6, build_int_cst (long_unsigned_type_node,
 	10));
   tree str_7 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
       POINTER_PLUS_EXPR, str_type, str_6, build_int_cst(size_type_node, -1));
   tree i_8 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-      TRUNC_MOD_EXPR, unsigned_type_node, i_6,
-      build_int_cst (unsigned_type_node, 10));
+      TRUNC_MOD_EXPR, long_unsigned_type_node, i_6,
+      build_int_cst (long_unsigned_type_node, 10));
   tree i_9 = gimple_convert (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
       unsigned_char_type_node, i_8);
   tree i_10 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
@@ -5292,7 +5292,7 @@ build_itoa_fn (void)
     gimple_build_assign (str_7_deref, i_11);
   gsi_insert_after (&gsi, char_write, GSI_NEW_STMT);
   gcond *bb7_cond =
-    gimple_build_cond (GT_EXPR, i_6, build_int_cst (unsigned_type_node, 9),
+    gimple_build_cond (GT_EXPR, i_6, build_int_cst (long_unsigned_type_node, 9),
 	NULL, NULL);
   gsi_insert_after (&gsi, bb7_cond, GSI_NEW_STMT);
 
