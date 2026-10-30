@@ -5245,7 +5245,7 @@ build_itoa_fn (void)
   tree i_1 = get_or_create_ssa_default_def (cfun, i_param_decl);
   gcond *bb2_cond =
     gimple_build_cond (LT_EXPR, i_1, build_zero_cst (long_integer_type_node),
-	NULL, NULL); // TODO Can I really get away with NULL, NULL?
+	NULL, NULL);
   gsi_insert_after (&gsi, bb2_cond, GSI_NEW_STMT);
 
   /* Output the minus sign
