@@ -5318,8 +5318,6 @@ build_itoa_fn (void)
   /* Update call graph.  */
   cgraph_node::add_new_function (fn_decl, true);
 
-  debug_function (fn_decl, (dump_flags_t)0); // DEBUG
-
   return fn_decl;
 }
 
