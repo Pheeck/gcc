@@ -5023,110 +5023,302 @@ build_itoa_fn (void)
   if (utoa_fn == NULL_TREE)
     utoa_fn = build_utoa_fn ();
 
-  /* size_t __itoa (char *str, long int val).  */
-  tree fn_decl = build_conversion_fn_decl ("__itoa", long_integer_type_node);
-  tree str_param_decl = DECL_ARGUMENTS (fn_decl);
-  tree i_param_decl = DECL_CHAIN (str_param_decl);
-  tree str_type = TREE_TYPE (str_param_decl);
+  /* Build and setup the function decl.  */
+  /* int __itoa(char *str, int i).  */
+  tree str_type = build_pointer_type (char_type_node);
+  tree fn_type = build_function_type_list (size_type_node, str_type,
+					   integer_type_node, NULL_TREE);
+  // TODO what name to use? Is __itoa ok?
+  tree fn_name = get_identifier ("__itoa");
+  tree fn_decl = build_decl (UNKNOWN_LOCATION, FUNCTION_DECL, fn_name, fn_type);
+
+  // TODO make sure these make sense
+  TREE_STATIC (fn_decl) = 0;
+  TREE_USED (fn_decl) = 1;
+  DECL_ARTIFICIAL (fn_decl) = 1;
+  DECL_IGNORED_P (fn_decl) = 0;
+  TREE_PUBLIC (fn_decl) = 1;
+  DECL_UNINLINABLE (fn_decl) = 0;
+  DECL_EXTERNAL (fn_decl) = 0;
+  DECL_CONTEXT (fn_decl) = NULL_TREE; // TODO maybe this should be some
+				   // TRANSLATION_UNIT_DECL?
+  DECL_INITIAL (fn_decl) = make_node (BLOCK); // TODO what should this be?
+  BLOCK_SUPERCONTEXT (DECL_INITIAL (fn_decl)) = fn_decl;
+  //DECL_ATTRIBUTES (fn_decl) = DECL_ATTRIBUTES (current_function_decl);
+
+  /* Build parameter and result value decls and connect them to the function
+     decl tree.  */
+  tree result_decl = build_decl (UNKNOWN_LOCATION, RESULT_DECL, NULL_TREE,
+				 size_type_node);
+  DECL_ARTIFICIAL (result_decl) = 1;
+  DECL_IGNORED_P (result_decl) = 1; // TODO does this make sense?
+  DECL_CONTEXT (result_decl) = fn_decl;
+  DECL_RESULT (fn_decl) = result_decl;
+
+  tree str_param_name = get_identifier ("str");
+  tree str_param_decl = build_decl (UNKNOWN_LOCATION, PARM_DECL,
+				    str_param_name, str_type);
+  DECL_ARTIFICIAL (str_param_decl) = 1;
+  DECL_NAMELESS (str_param_decl) = 1; // TODO does this make sense?
+  DECL_ARG_TYPE (str_param_decl) = str_type;
+  DECL_CONTEXT (str_param_decl) = fn_decl;
+  TREE_USED (str_param_decl) = 1;
+  TREE_READONLY (str_param_decl) = 0; // TODO do I have to set this explicitly?
+
+  tree i_param_name = get_identifier ("i");
+  tree i_param_decl = build_decl (UNKNOWN_LOCATION, PARM_DECL,
+				    i_param_name, integer_type_node);
+  DECL_ARTIFICIAL (i_param_decl) = 1;
+  DECL_NAMELESS (i_param_decl) = 1; // TODO does this make sense?
+  DECL_ARG_TYPE (i_param_decl) = integer_type_node;
+  DECL_CONTEXT (i_param_decl) = fn_decl;
+  TREE_USED (i_param_decl) = 1;
+  TREE_READONLY (i_param_decl) = 0; // TODO do I have to set this explicitly?
+
+  DECL_RESULT (fn_decl) = result_decl;
+  DECL_CHAIN (str_param_decl) = i_param_decl;
+  DECL_ARGUMENTS (fn_decl) = str_param_decl;
 
   // TODO actually handle profile
   profile_count cfg_count = profile_count::uninitialized ();
-  push_cfun (cfun);
-  basic_block entry_bb = init_lowered_empty_function (fn_decl, true,
-						      cfg_count);
+  // TODO do I need to save both and isn't there a smarter way to do this?
+  struct function *saved_cfun = cfun;
+  tree saved_function_decl = current_function_decl;
+  basic_block bb = init_lowered_empty_function (fn_decl, true, cfg_count);
 
-  /* Build the body below.  Temporaries are plain registers rather than SSA
-     names; update_ssa rewrites them into SSA form.
+  /* Build CFG.
 
-       entry_bb:
-	 u = ABSU_EXPR <val>;
-	 neg = val < 0;
-	 if (neg != 0) goto minus_bb; else goto call_bb;
+     bb1 (ENTRY)
+      |
+     bb2
+      t f
+      | \
+     bb3 |
+      | /
+     bb4
+      | /-\
+     bb5   |
+      f t  |
+      | \-/
+      |
+     bb6
+      |
+      | /-\
+     bb7   |
+      f t  |
+      | \-/
+     bb8
+      |
+     bb9 (EXIT)  */
+  basic_block bb2 = bb;
+  basic_block bb3 = split_block_after_labels (bb2)->dest;
+  basic_block bb4 = split_block_after_labels (bb3)->dest;
+  basic_block bb5 = split_block_after_labels (bb4)->dest;
+  basic_block bb6 = split_block_after_labels (bb5)->dest;
+  basic_block bb7 = split_block_after_labels (bb6)->dest;
+  basic_block bb8 = split_block_after_labels (bb7)->dest;
 
-       minus_bb:
-	 *str = '-';
+  edge e23 = single_succ_edge (bb2);
+  e23->flags ^= EDGE_TRUE_VALUE | EDGE_FALLTHRU;
+  edge e24 = make_edge (bb2, bb4, EDGE_FALSE_VALUE);
 
-       call_bb:
-	 off = (size_t) neg;
-	 p = str + off;
-	 len = __utoa (p, u);
-	 len = len + off;
-	 return len;
+  edge e56 = single_succ_edge (bb5);
+  e56->flags ^= EDGE_FALSE_VALUE | EDGE_FALLTHRU;
+  edge e55 = make_edge (bb5, bb5, EDGE_TRUE_VALUE);
 
-     Using the absolute value as an unsigned long makes LONG_MIN work.  */
+  edge e78 = single_succ_edge (bb7);
+  e78->flags ^= EDGE_FALSE_VALUE | EDGE_FALLTHRU;
+  edge e77 = make_edge (bb7, bb7, EDGE_TRUE_VALUE);
 
-  tree char_ptr_zero = build_int_cst (str_type, 0);
-  tree target_minus = build_int_cst (char_type_node,
-				     lang_hooks.to_target_charset ('-'));
+  /* Fill out profile information.  */
+  e23->probability = profile_probability::unlikely ();
+  e24->probability = profile_probability::likely ();
+  e55->probability = profile_probability::likely ();
+  e56->probability = profile_probability::unlikely ();
+  e77->probability = profile_probability::likely ();
+  e78->probability = profile_probability::unlikely ();
 
-  tree u = create_tmp_reg (long_unsigned_type_node, "u");
-  tree neg = create_tmp_reg (boolean_type_node, "neg");
-  tree off = create_tmp_reg (size_type_node, "off");
-  tree p = create_tmp_reg (str_type, "p");
-  tree len = create_tmp_reg (size_type_node, "len");
+  /* Fill out dominator and loop info.  */
+  // TODO Would be faster to do this manually
+  calculate_dominance_info (CDI_DOMINATORS);
+  class loop *bb5_loop = alloc_loop ();
+  bb5_loop->header = bb5;
+  bb5_loop->latch = bb5;
+  add_loop (bb5_loop, bb5->loop_father);
+  class loop *bb7_loop = alloc_loop ();
+  bb7_loop->header = bb7;
+  bb7_loop->latch = bb7;
+  add_loop (bb7_loop, bb7->loop_father);
 
-  /* Create the basic blocks.  */
-  basic_block minus_bb = create_basic_block (NULL, entry_bb);
-  basic_block call_bb = create_basic_block (NULL, minus_bb);
+  /* Insert GIMPLE statements.  */
+  gimple_stmt_iterator gsi;
+  gphi *phi_i, *phi_str;
 
-  class loop *root_loop = entry_bb->loop_father;
-  add_bb_to_loop (minus_bb, root_loop);
-  add_bb_to_loop (call_bb, root_loop);
+  // TODO make the bb comments nicer
+  /*
+  <bb 2> [local count: 118111600]:
+  if (i_16(D) < 0)
+    goto <bb 3>; [41.00%]
+  else
+    goto <bb 4>; [59.00%]
+  */
+  gsi = gsi_start_bb (bb2);
+  tree i_1 = get_or_create_ssa_default_def (cfun, i_param_decl);
+  gcond *bb2_cond =
+    gimple_build_cond (LT_EXPR, i_1, build_zero_cst (integer_type_node),
+	NULL, NULL); // TODO Can I really get away with NULL, NULL?
+  gsi_insert_after (&gsi, bb2_cond, GSI_NEW_STMT);
 
-  /* Connect them.  The entry block is initially connected to the exit
-     block.  */
-  remove_edge (single_succ_edge (entry_bb));
+  /* Output the minus sign
+  <bb 3> [local count: 48425756]:
+  _50 = str_15(D) + 1;
+  *str_15(D) = 45;
+  */
+  gsi = gsi_start_bb (bb3);
+  tree str_1 = get_or_create_ssa_default_def (cfun, str_param_decl);
+  tree str_2 =
+    gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+	POINTER_PLUS_EXPR, str_type, str_1, build_one_cst (size_type_node));
+  tree str_1_deref = build_simple_mem_ref (str_1);
+  gassign *minus_write =
+    gimple_build_assign (str_1_deref, build_int_cst (char_type_node, 45));
+  gsi_insert_after (&gsi, minus_write, GSI_NEW_STMT);
 
-  edge e = make_edge (entry_bb, minus_bb, EDGE_TRUE_VALUE);
-  e->probability = profile_probability::even ();
-  e = make_edge (entry_bb, call_bb, EDGE_FALSE_VALUE);
-  e->probability = profile_probability::even ();
+  /*
+  <bb 4> [local count: 118111600]:
+  # str_8 = PHI <str_15(D)(2), _50(3)>
+  u_20 = ABSU_EXPR <i_16(D)>;
+  */
+  tree str_3 = make_ssa_name (str_param_decl);
+  phi_str = create_phi_node (str_3, bb4);
+  add_phi_arg (phi_str, str_1, e24, UNKNOWN_LOCATION);
+  add_phi_arg (phi_str, str_2, single_succ_edge (bb3), UNKNOWN_LOCATION);
 
-  make_single_succ_edge (minus_bb, call_bb, EDGE_FALLTHRU);
-  make_single_succ_edge (call_bb, EXIT_BLOCK_PTR_FOR_FN (cfun), 0);
+  gsi = gsi_start_bb (bb4);
+  // TODO there's no i_2, I can shift all i_* number down by one
+  // TODO also, I could call them u_* since they're unsigned
+  tree i_3 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+      ABSU_EXPR, unsigned_type_node, i_1);
 
-  /* Fill entry_bb.  */
-  gimple_stmt_iterator gsi = gsi_start_bb (entry_bb);
-  gimple *g = gimple_build_assign (u, ABSU_EXPR, i_param_decl);
-  gsi_insert_after (&gsi, g, GSI_NEW_STMT);
-  g = gimple_build_assign (neg, LT_EXPR, i_param_decl,
-			   build_zero_cst (long_integer_type_node));
-  gsi_insert_after (&gsi, g, GSI_NEW_STMT);
-  g = gimple_build_cond (NE_EXPR, neg, boolean_false_node,
-			 NULL_TREE, NULL_TREE);
-  gsi_insert_after (&gsi, g, GSI_NEW_STMT);
+  /*
+  <bb 5> [local count: 1073741824]:
+  # str_9 = PHI <str_8(4), str_22(5)>
+  # u3_11 = PHI <u_20(4), u3_21(5)>
+  u3_21 = u3_11 / 10;
+  str_22 = str_9 + 1;
+  if (u3_11 > 9)
+    goto <bb 5>; [89.00%]
+  else
+    goto <bb 6>; [11.00%]
+  */
+  /* Just build PHIs.  Add arguments after the gimple_build(...) API gives them
+     to us.  */
+  tree str_4 = make_ssa_name (str_param_decl);
+  tree i_4 = make_ssa_name (unsigned_type_node);
+  phi_str = create_phi_node (str_4, bb5);
+  phi_i = create_phi_node (i_4, bb5);
 
-  /* Fill minus_bb.  */
-  gsi = gsi_start_bb (minus_bb);
-  g = gimple_build_assign (build2 (MEM_REF, char_type_node, str_param_decl,
-				   char_ptr_zero),
-			   target_minus);
-  gsi_insert_after (&gsi, g, GSI_NEW_STMT);
+  gsi = gsi_start_bb (bb5);
+  tree i_5 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+      TRUNC_DIV_EXPR, unsigned_type_node, i_4, build_int_cst (unsigned_type_node,
+	10));
+  tree str_5 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+      POINTER_PLUS_EXPR, str_type, str_4, build_one_cst (size_type_node));
+  gcond *bb5_cond =
+    gimple_build_cond (GT_EXPR, i_4, build_int_cst (unsigned_type_node, 9),
+	NULL, NULL);
+  gsi_insert_after (&gsi, bb5_cond, GSI_NEW_STMT);
 
-  /* Fill call_bb.  */
-  gsi = gsi_start_bb (call_bb);
-  g = gimple_build_assign (off, NOP_EXPR, neg);
-  gsi_insert_after (&gsi, g, GSI_NEW_STMT);
-  g = gimple_build_assign (p, POINTER_PLUS_EXPR, str_param_decl, off);
-  gsi_insert_after (&gsi, g, GSI_NEW_STMT);
-  gcall *utoa_call = gimple_build_call (utoa_fn, 2, p, u);
-  gimple_call_set_lhs (utoa_call, len);
-  gsi_insert_after (&gsi, utoa_call, GSI_NEW_STMT);
-  g = gimple_build_assign (len, PLUS_EXPR, len, off);
-  gsi_insert_after (&gsi, g, GSI_NEW_STMT);
-  g = gimple_build_return (len);
-  gsi_insert_after (&gsi, g, GSI_NEW_STMT);
+  add_phi_arg (phi_str, str_3, single_succ_edge (bb4), UNKNOWN_LOCATION);
+  add_phi_arg (phi_str, str_5, e55, UNKNOWN_LOCATION);
+  add_phi_arg (phi_i, i_3, single_succ_edge (bb4), UNKNOWN_LOCATION);
+  add_phi_arg (phi_i, i_5, e55, UNKNOWN_LOCATION);
 
+  /*
+  <bb 6> [local count: 118111600]:
+  _2 = str_22 - str_15(D);
+  _3 = (size_t) _2;
+  */
+  gsi = gsi_start_bb (bb6);
+  // TODO am I using the right type here:?
+  tree written_1 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+      POINTER_DIFF_EXPR, long_integer_type_node, str_5, str_1);
+  tree written_2 = gimple_convert (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+      size_type_node, written_1);
+
+  /*
+  <bb 7> [local count: 1073741824]:
+  # str_10 = PHI <str_22(6), str_25(7)>
+  # u3_12 = PHI <u_20(6), u3_24(7)>
+  u3_24 = u3_12 / 10;
+  str_25 = str_10 + 18446744073709551615; // minus one
+  _4 = u3_12 % 10;
+  _5 = (unsigned char) _4; // why this conversion?
+  _6 = _5 + 48;
+  _7 = (char) _6;
+  MEM[(char *)str_25] = _7;
+  if (u3_12 > 9)
+    goto <bb 7>; [89.00%]
+  else
+    goto <bb 8>; [11.00%]
+  */
+  /* Just build PHIs.  Add arguments after the gimple_build(...) API gives them
+     to us.  */
+  tree str_6 = make_ssa_name (str_param_decl);
+  tree i_6 = make_ssa_name (unsigned_type_node);
+  phi_str = create_phi_node (str_6, bb7);
+  phi_i = create_phi_node (i_6, bb7);
+
+  /* Build non-phi statements first.  Otherwise, we couldn't use the
+     gimple_build (...) API.  */
+  gsi = gsi_start_bb (bb7);
+  tree i_7 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+      TRUNC_DIV_EXPR, unsigned_type_node, i_6, build_int_cst (unsigned_type_node,
+	10));
+  tree str_7 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+      POINTER_PLUS_EXPR, str_type, str_6, build_int_cst(size_type_node, -1));
+  tree i_8 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+      TRUNC_MOD_EXPR, unsigned_type_node, i_6,
+      build_int_cst (unsigned_type_node, 10));
+  tree i_9 = gimple_convert (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+      unsigned_char_type_node, i_8);
+  tree i_10 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+      PLUS_EXPR, unsigned_char_type_node, i_9,
+      build_int_cst (unsigned_char_type_node, 48));
+  tree i_11 = gimple_convert (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+      char_type_node, i_10);
+  tree str_7_deref = build_simple_mem_ref (str_7);
+  gassign *char_write =
+    gimple_build_assign (str_7_deref, i_11);
+  gsi_insert_after (&gsi, char_write, GSI_NEW_STMT);
+  gcond *bb7_cond =
+    gimple_build_cond (GT_EXPR, i_6, build_int_cst (unsigned_type_node, 9),
+	NULL, NULL);
+  gsi_insert_after (&gsi, bb7_cond, GSI_NEW_STMT);
+
+  add_phi_arg (phi_str, str_5, single_succ_edge (bb6), UNKNOWN_LOCATION);
+  add_phi_arg (phi_str, str_7, e77, UNKNOWN_LOCATION);
+  add_phi_arg (phi_i, i_3, single_succ_edge (bb6), UNKNOWN_LOCATION);
+  add_phi_arg (phi_i, i_7, e77, UNKNOWN_LOCATION);
+
+  /*
+  <bb 8> [local count: 118111600]:
+  return written_2;
+  */
+  gsi = gsi_start_bb (bb8);
+  greturn *return_stmt = gimple_build_return (written_2);
+  gsi_insert_after (&gsi, return_stmt, GSI_NEW_STMT);
+
+  /* Finish building the function body.  */
+  // TODO could I get by with just updating the virtuals?
   update_ssa (TODO_update_ssa);
-  free_dominance_info (CDI_DOMINATORS);
+  set_cfun (saved_cfun);
+  current_function_decl = saved_function_decl;
 
-  /* Update call graph.  The body is already lowered, so nothing else builds
-     the edge to __utoa.  */
+  /* Update call graph.  */
   cgraph_node::add_new_function (fn_decl, true);
-  cgraph_node::get (fn_decl)->create_edge (cgraph_node::get (utoa_fn),
-					   utoa_call, call_bb->count);
 
-  pop_cfun ();
+  debug_function (fn_decl, (dump_flags_t)0); // DEBUG
 
   return fn_decl;
 }
