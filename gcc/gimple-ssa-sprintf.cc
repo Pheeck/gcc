@@ -5088,8 +5088,7 @@ build_utoa_fn (void)
   gsi_insert_after (&gsi, return_stmt, GSI_NEW_STMT);
 
   /* Finish building the function body.  */
-  // TODO could I get by with just updating the virtuals?
-  update_ssa (TODO_update_ssa);
+  update_ssa (TODO_update_ssa_only_virtuals);
   set_cfun (saved_cfun);
   current_function_decl = saved_function_decl;
 
@@ -5391,8 +5390,7 @@ build_itoa_fn (void)
   gsi_insert_after (&gsi, return_stmt, GSI_NEW_STMT);
 
   /* Finish building the function body.  */
-  // TODO could I get by with just updating the virtuals?
-  update_ssa (TODO_update_ssa);
+  update_ssa (TODO_update_ssa_only_virtuals);
   set_cfun (saved_cfun);
   current_function_decl = saved_function_decl;
 
