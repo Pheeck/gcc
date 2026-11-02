@@ -4862,8 +4862,7 @@ build_utoa_fn (void)
   tree str_type = build_pointer_type (char_type_node);
   tree fn_type = build_function_type_list (size_type_node, str_type,
 					   long_unsigned_type_node, NULL_TREE);
-  // TODO what name to use? Is __utoa ok?
-  tree fn_name = get_identifier ("__utoa");
+  tree fn_name = get_identifier ("utoa.0");
   tree fn_decl = build_decl (UNKNOWN_LOCATION, FUNCTION_DECL, fn_name, fn_type);
 
   // TODO make sure these make sense
@@ -5107,8 +5106,7 @@ build_itoa_fn (void)
   tree str_type = build_pointer_type (char_type_node);
   tree fn_type = build_function_type_list (size_type_node, str_type,
 					   long_integer_type_node, NULL_TREE);
-  // TODO what name to use? Is __itoa ok?
-  tree fn_name = get_identifier ("__itoa");
+  tree fn_name = get_identifier ("itoa.0");
   tree fn_decl = build_decl (UNKNOWN_LOCATION, FUNCTION_DECL, fn_name, fn_type);
 
   // TODO make sure these make sense
