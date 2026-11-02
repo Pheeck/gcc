@@ -4863,7 +4863,6 @@ build_utoa_fn (void)
   tree str_type = TREE_TYPE (str_param_decl);
   tree val_param_decl = DECL_CHAIN (str_param_decl);
 
-  // TODO actually handle profile
   profile_count cfg_count = profile_count::uninitialized ();
   // TODO do I need to save both and isn't there a smarter way to do this?
   struct function *saved_cfun = cfun;
@@ -5057,7 +5056,6 @@ build_itoa_fn (void)
   tree str_type = TREE_TYPE (str_param_decl);
   tree val_param_decl = DECL_CHAIN (str_param_decl);
 
-  // TODO actually handle profile
   profile_count cfg_count = profile_count::uninitialized ();
   // TODO do I need to save both and isn't there a smarter way to do this?
   struct function *saved_cfun = cfun;
