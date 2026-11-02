@@ -4864,7 +4864,10 @@ build_utoa_fn (void)
   tree val_param_decl = DECL_CHAIN (str_param_decl);
 
   profile_count cfg_count = profile_count::uninitialized ();
-  // TODO do I need to save both and isn't there a smarter way to do this?
+
+  /* 'init_lowered_empty_function()' changes cfun and decl to the new function.
+     We cannot simply restore them by 'pop_cfun()', thus we save them
+     manually.  */
   struct function *saved_cfun = cfun;
   tree saved_function_decl = current_function_decl;
   basic_block bb = init_lowered_empty_function (fn_decl, true, cfg_count);
@@ -5057,7 +5060,10 @@ build_itoa_fn (void)
   tree val_param_decl = DECL_CHAIN (str_param_decl);
 
   profile_count cfg_count = profile_count::uninitialized ();
-  // TODO do I need to save both and isn't there a smarter way to do this?
+
+  /* 'init_lowered_empty_function()' changes cfun and decl to the new function.
+     We cannot simply restore them by 'pop_cfun()', thus we save them
+     manually.  */
   struct function *saved_cfun = cfun;
   tree saved_function_decl = current_function_decl;
   basic_block bb = init_lowered_empty_function (fn_decl, true, cfg_count);
