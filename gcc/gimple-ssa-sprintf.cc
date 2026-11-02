@@ -5005,7 +5005,7 @@ build_utoa_fn (void)
       TRUNC_DIV_EXPR, long_unsigned_type_node, val_6, build_int_cst (long_unsigned_type_node,
 	10));
   tree str_7 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-      POINTER_PLUS_EXPR, str_type, str_6, build_int_cst(size_type_node, -1));
+      POINTER_PLUS_EXPR, str_type, str_6, size_int (-1));
   tree val_8 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
       TRUNC_MOD_EXPR, long_unsigned_type_node, val_6,
       build_int_cst (long_unsigned_type_node, 10));
@@ -5256,7 +5256,7 @@ build_itoa_fn (void)
       TRUNC_DIV_EXPR, long_unsigned_type_node, val_6, build_int_cst (long_unsigned_type_node,
 	10));
   tree str_7 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-      POINTER_PLUS_EXPR, str_type, str_6, build_int_cst(size_type_node, -1));
+      POINTER_PLUS_EXPR, str_type, str_6, size_int (-1));
   tree val_8 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
       TRUNC_MOD_EXPR, long_unsigned_type_node, val_6,
       build_int_cst (long_unsigned_type_node, 10));
