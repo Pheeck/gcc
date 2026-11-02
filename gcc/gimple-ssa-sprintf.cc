@@ -4794,6 +4794,7 @@ get_user_idx_format (tree fndecl, unsigned *idx_args)
 /* Build the decl of a function NAME with signature
    size_t NAME (char *str, VAL_TYPE val), as used by the integer to string
    conversion functions below.  */
+
 static tree
 build_conversion_fn_decl (const char *name, tree val_type)
 {
@@ -4857,60 +4858,10 @@ build_conversion_fn_decl (const char *name, tree val_type)
 static tree
 build_utoa_fn (void)
 {
-  /* Build and setup the function decl.  */
-  /* size_t __utoa(char *str, unsigned long int i).  */
-  tree str_type = build_pointer_type (char_type_node);
-  tree fn_type = build_function_type_list (size_type_node, str_type,
-					   long_unsigned_type_node, NULL_TREE);
-  tree fn_name = get_identifier ("utoa.0");
-  tree fn_decl = build_decl (UNKNOWN_LOCATION, FUNCTION_DECL, fn_name, fn_type);
-
-  // TODO make sure these make sense
-  TREE_STATIC (fn_decl) = 0;
-  TREE_USED (fn_decl) = 1;
-  DECL_ARTIFICIAL (fn_decl) = 1;
-  DECL_IGNORED_P (fn_decl) = 0;
-  TREE_PUBLIC (fn_decl) = 1;
-  DECL_UNINLINABLE (fn_decl) = 0;
-  DECL_EXTERNAL (fn_decl) = 0;
-  DECL_CONTEXT (fn_decl) = NULL_TREE; // TODO maybe this should be some
-				   // TRANSLATION_UNIT_DECL?
-  DECL_INITIAL (fn_decl) = make_node (BLOCK); // TODO what should this be?
-  BLOCK_SUPERCONTEXT (DECL_INITIAL (fn_decl)) = fn_decl;
-  //DECL_ATTRIBUTES (fn_decl) = DECL_ATTRIBUTES (current_function_decl);
-
-  /* Build parameter and result value decls and connect them to the function
-     decl tree.  */
-  tree result_decl = build_decl (UNKNOWN_LOCATION, RESULT_DECL, NULL_TREE,
-				 size_type_node);
-  DECL_ARTIFICIAL (result_decl) = 1;
-  DECL_IGNORED_P (result_decl) = 1; // TODO does this make sense?
-  DECL_CONTEXT (result_decl) = fn_decl;
-  DECL_RESULT (fn_decl) = result_decl;
-
-  tree str_param_name = get_identifier ("str");
-  tree str_param_decl = build_decl (UNKNOWN_LOCATION, PARM_DECL,
-				    str_param_name, str_type);
-  DECL_ARTIFICIAL (str_param_decl) = 1;
-  DECL_NAMELESS (str_param_decl) = 1; // TODO does this make sense?
-  DECL_ARG_TYPE (str_param_decl) = str_type;
-  DECL_CONTEXT (str_param_decl) = fn_decl;
-  TREE_USED (str_param_decl) = 1;
-  TREE_READONLY (str_param_decl) = 0; // TODO do I have to set this explicitly?
-
-  tree i_param_name = get_identifier ("i");
-  tree i_param_decl = build_decl (UNKNOWN_LOCATION, PARM_DECL,
-				    i_param_name, long_unsigned_type_node);
-  DECL_ARTIFICIAL (i_param_decl) = 1;
-  DECL_NAMELESS (i_param_decl) = 1; // TODO does this make sense?
-  DECL_ARG_TYPE (i_param_decl) = long_unsigned_type_node;
-  DECL_CONTEXT (i_param_decl) = fn_decl;
-  TREE_USED (i_param_decl) = 1;
-  TREE_READONLY (i_param_decl) = 0; // TODO do I have to set this explicitly?
-
-  DECL_RESULT (fn_decl) = result_decl;
-  DECL_CHAIN (str_param_decl) = i_param_decl;
-  DECL_ARGUMENTS (fn_decl) = str_param_decl;
+  tree fn_decl = build_conversion_fn_decl ("utoa.0", long_unsigned_type_node);
+  tree str_param_decl = DECL_ARGUMENTS (fn_decl);
+  tree str_type = TREE_TYPE (str_param_decl);
+  tree val_param_decl = DECL_CHAIN (str_param_decl);
 
   // TODO actually handle profile
   profile_count cfg_count = profile_count::uninitialized ();
@@ -4972,7 +4923,7 @@ build_utoa_fn (void)
 
   /* Insert GIMPLE statements.  */
   gimple_stmt_iterator gsi;
-  gphi *phi_i, *phi_str;
+  gphi *phi_val, *phi_str;
 
   // TODO make the bb comments nicer
   /*
@@ -4989,27 +4940,27 @@ build_utoa_fn (void)
   /* Just build PHIs.  Add arguments after the gimple_build(...) API gives them
      to us.  */
   tree str_4 = make_ssa_name (str_param_decl);
-  tree i_4 = make_ssa_name (long_unsigned_type_node);
+  tree val_4 = make_ssa_name (long_unsigned_type_node);
   phi_str = create_phi_node (str_4, bb5);
-  phi_i = create_phi_node (i_4, bb5);
+  phi_val = create_phi_node (val_4, bb5);
 
   gsi = gsi_start_bb (bb5);
-  tree i_5 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-      TRUNC_DIV_EXPR, long_unsigned_type_node, i_4, build_int_cst (long_unsigned_type_node,
+  tree val_5 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+      TRUNC_DIV_EXPR, long_unsigned_type_node, val_4, build_int_cst (long_unsigned_type_node,
 	10));
   tree str_5 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
       POINTER_PLUS_EXPR, str_type, str_4, build_one_cst (size_type_node));
   gcond *bb5_cond =
-    gimple_build_cond (GT_EXPR, i_4, build_int_cst (long_unsigned_type_node, 9),
+    gimple_build_cond (GT_EXPR, val_4, build_int_cst (long_unsigned_type_node, 9),
 	NULL, NULL);
   gsi_insert_after (&gsi, bb5_cond, GSI_NEW_STMT);
 
   tree str_1 = get_or_create_ssa_default_def (cfun, str_param_decl);
-  tree i_1 = get_or_create_ssa_default_def (cfun, i_param_decl);
+  tree val_1 = get_or_create_ssa_default_def (cfun, val_param_decl);
   add_phi_arg (phi_str, str_1, e15, UNKNOWN_LOCATION);
   add_phi_arg (phi_str, str_5, e55, UNKNOWN_LOCATION);
-  add_phi_arg (phi_i, i_1, e15, UNKNOWN_LOCATION);
-  add_phi_arg (phi_i, i_5, e55, UNKNOWN_LOCATION);
+  add_phi_arg (phi_val, val_1, e15, UNKNOWN_LOCATION);
+  add_phi_arg (phi_val, val_5, e55, UNKNOWN_LOCATION);
 
   /*
   <bb 6> [local count: 118111600]:
@@ -5041,41 +4992,41 @@ build_utoa_fn (void)
   /* Just build PHIs.  Add arguments after the gimple_build(...) API gives them
      to us.  */
   tree str_6 = make_ssa_name (str_param_decl);
-  tree i_6 = make_ssa_name (long_unsigned_type_node);
+  tree val_6 = make_ssa_name (long_unsigned_type_node);
   phi_str = create_phi_node (str_6, bb7);
-  phi_i = create_phi_node (i_6, bb7);
+  phi_val = create_phi_node (val_6, bb7);
 
   /* Build non-phi statements first.  Otherwise, we couldn't use the
      gimple_build (...) API.  */
   gsi = gsi_start_bb (bb7);
-  tree i_7 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-      TRUNC_DIV_EXPR, long_unsigned_type_node, i_6, build_int_cst (long_unsigned_type_node,
+  tree val_7 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+      TRUNC_DIV_EXPR, long_unsigned_type_node, val_6, build_int_cst (long_unsigned_type_node,
 	10));
   tree str_7 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
       POINTER_PLUS_EXPR, str_type, str_6, build_int_cst(size_type_node, -1));
-  tree i_8 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-      TRUNC_MOD_EXPR, long_unsigned_type_node, i_6,
+  tree val_8 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+      TRUNC_MOD_EXPR, long_unsigned_type_node, val_6,
       build_int_cst (long_unsigned_type_node, 10));
-  tree i_9 = gimple_convert (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-      unsigned_char_type_node, i_8);
-  tree i_10 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-      PLUS_EXPR, unsigned_char_type_node, i_9,
+  tree val_9 = gimple_convert (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+      unsigned_char_type_node, val_8);
+  tree val_10 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+      PLUS_EXPR, unsigned_char_type_node, val_9,
       build_int_cst (unsigned_char_type_node, 48));
-  tree i_11 = gimple_convert (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-      char_type_node, i_10);
+  tree val_11 = gimple_convert (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+      char_type_node, val_10);
   tree str_7_deref = build_simple_mem_ref (str_7);
   gassign *char_write =
-    gimple_build_assign (str_7_deref, i_11);
+    gimple_build_assign (str_7_deref, val_11);
   gsi_insert_after (&gsi, char_write, GSI_NEW_STMT);
   gcond *bb7_cond =
-    gimple_build_cond (GT_EXPR, i_6, build_int_cst (long_unsigned_type_node, 9),
+    gimple_build_cond (GT_EXPR, val_6, build_int_cst (long_unsigned_type_node, 9),
 	NULL, NULL);
   gsi_insert_after (&gsi, bb7_cond, GSI_NEW_STMT);
 
   add_phi_arg (phi_str, str_5, single_succ_edge (bb6), UNKNOWN_LOCATION);
   add_phi_arg (phi_str, str_7, e77, UNKNOWN_LOCATION);
-  add_phi_arg (phi_i, i_1, single_succ_edge (bb6), UNKNOWN_LOCATION);
-  add_phi_arg (phi_i, i_7, e77, UNKNOWN_LOCATION);
+  add_phi_arg (phi_val, val_1, single_succ_edge (bb6), UNKNOWN_LOCATION);
+  add_phi_arg (phi_val, val_7, e77, UNKNOWN_LOCATION);
 
   /*
   <bb 8> [local count: 118111600]:
@@ -5101,60 +5052,10 @@ build_utoa_fn (void)
 static tree
 build_itoa_fn (void)
 {
-  /* Build and setup the function decl.  */
-  /* size_t __itoa(char *str, long int i).  */
-  tree str_type = build_pointer_type (char_type_node);
-  tree fn_type = build_function_type_list (size_type_node, str_type,
-					   long_integer_type_node, NULL_TREE);
-  tree fn_name = get_identifier ("itoa.0");
-  tree fn_decl = build_decl (UNKNOWN_LOCATION, FUNCTION_DECL, fn_name, fn_type);
-
-  // TODO make sure these make sense
-  TREE_STATIC (fn_decl) = 0;
-  TREE_USED (fn_decl) = 1;
-  DECL_ARTIFICIAL (fn_decl) = 1;
-  DECL_IGNORED_P (fn_decl) = 0;
-  TREE_PUBLIC (fn_decl) = 1;
-  DECL_UNINLINABLE (fn_decl) = 0;
-  DECL_EXTERNAL (fn_decl) = 0;
-  DECL_CONTEXT (fn_decl) = NULL_TREE; // TODO maybe this should be some
-				   // TRANSLATION_UNIT_DECL?
-  DECL_INITIAL (fn_decl) = make_node (BLOCK); // TODO what should this be?
-  BLOCK_SUPERCONTEXT (DECL_INITIAL (fn_decl)) = fn_decl;
-  //DECL_ATTRIBUTES (fn_decl) = DECL_ATTRIBUTES (current_function_decl);
-
-  /* Build parameter and result value decls and connect them to the function
-     decl tree.  */
-  tree result_decl = build_decl (UNKNOWN_LOCATION, RESULT_DECL, NULL_TREE,
-				 size_type_node);
-  DECL_ARTIFICIAL (result_decl) = 1;
-  DECL_IGNORED_P (result_decl) = 1; // TODO does this make sense?
-  DECL_CONTEXT (result_decl) = fn_decl;
-  DECL_RESULT (fn_decl) = result_decl;
-
-  tree str_param_name = get_identifier ("str");
-  tree str_param_decl = build_decl (UNKNOWN_LOCATION, PARM_DECL,
-				    str_param_name, str_type);
-  DECL_ARTIFICIAL (str_param_decl) = 1;
-  DECL_NAMELESS (str_param_decl) = 1; // TODO does this make sense?
-  DECL_ARG_TYPE (str_param_decl) = str_type;
-  DECL_CONTEXT (str_param_decl) = fn_decl;
-  TREE_USED (str_param_decl) = 1;
-  TREE_READONLY (str_param_decl) = 0; // TODO do I have to set this explicitly?
-
-  tree i_param_name = get_identifier ("i");
-  tree i_param_decl = build_decl (UNKNOWN_LOCATION, PARM_DECL,
-				    i_param_name, long_integer_type_node);
-  DECL_ARTIFICIAL (i_param_decl) = 1;
-  DECL_NAMELESS (i_param_decl) = 1; // TODO does this make sense?
-  DECL_ARG_TYPE (i_param_decl) = long_integer_type_node;
-  DECL_CONTEXT (i_param_decl) = fn_decl;
-  TREE_USED (i_param_decl) = 1;
-  TREE_READONLY (i_param_decl) = 0; // TODO do I have to set this explicitly?
-
-  DECL_RESULT (fn_decl) = result_decl;
-  DECL_CHAIN (str_param_decl) = i_param_decl;
-  DECL_ARGUMENTS (fn_decl) = str_param_decl;
+  tree fn_decl = build_conversion_fn_decl ("itoa.0", long_integer_type_node);
+  tree str_param_decl = DECL_ARGUMENTS (fn_decl);
+  tree str_type = TREE_TYPE (str_param_decl);
+  tree val_param_decl = DECL_CHAIN (str_param_decl);
 
   // TODO actually handle profile
   profile_count cfg_count = profile_count::uninitialized ();
@@ -5229,20 +5130,20 @@ build_itoa_fn (void)
 
   /* Insert GIMPLE statements.  */
   gimple_stmt_iterator gsi;
-  gphi *phi_i, *phi_str;
+  gphi *phi_val, *phi_str;
 
   // TODO make the bb comments nicer
   /*
   <bb 2> [local count: 118111600]:
-  if (i_16(D) < 0)
+  if (val_16(D) < 0)
     goto <bb 3>; [41.00%]
   else
     goto <bb 4>; [59.00%]
   */
   gsi = gsi_start_bb (bb2);
-  tree i_1 = get_or_create_ssa_default_def (cfun, i_param_decl);
+  tree val_1 = get_or_create_ssa_default_def (cfun, val_param_decl);
   gcond *bb2_cond =
-    gimple_build_cond (LT_EXPR, i_1, build_zero_cst (long_integer_type_node),
+    gimple_build_cond (LT_EXPR, val_1, build_zero_cst (long_integer_type_node),
 	NULL, NULL);
   gsi_insert_after (&gsi, bb2_cond, GSI_NEW_STMT);
 
@@ -5272,10 +5173,9 @@ build_itoa_fn (void)
   add_phi_arg (phi_str, str_2, single_succ_edge (bb3), UNKNOWN_LOCATION);
 
   gsi = gsi_start_bb (bb4);
-  // TODO there's no i_2, I can shift all i_* number down by one
-  // TODO also, I could call them u_* since they're unsigned
-  tree i_3 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-      ABSU_EXPR, long_unsigned_type_node, i_1);
+  // TODO there's no val_2, I can shift all val_* number down by one
+  tree val_3 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+      ABSU_EXPR, long_unsigned_type_node, val_1);
 
   /*
   <bb 5> [local count: 1073741824]:
@@ -5291,25 +5191,25 @@ build_itoa_fn (void)
   /* Just build PHIs.  Add arguments after the gimple_build(...) API gives them
      to us.  */
   tree str_4 = make_ssa_name (str_param_decl);
-  tree i_4 = make_ssa_name (long_unsigned_type_node);
+  tree val_4 = make_ssa_name (long_unsigned_type_node);
   phi_str = create_phi_node (str_4, bb5);
-  phi_i = create_phi_node (i_4, bb5);
+  phi_val = create_phi_node (val_4, bb5);
 
   gsi = gsi_start_bb (bb5);
-  tree i_5 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-      TRUNC_DIV_EXPR, long_unsigned_type_node, i_4, build_int_cst (long_unsigned_type_node,
+  tree val_5 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+      TRUNC_DIV_EXPR, long_unsigned_type_node, val_4, build_int_cst (long_unsigned_type_node,
 	10));
   tree str_5 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
       POINTER_PLUS_EXPR, str_type, str_4, build_one_cst (size_type_node));
   gcond *bb5_cond =
-    gimple_build_cond (GT_EXPR, i_4, build_int_cst (long_unsigned_type_node, 9),
+    gimple_build_cond (GT_EXPR, val_4, build_int_cst (long_unsigned_type_node, 9),
 	NULL, NULL);
   gsi_insert_after (&gsi, bb5_cond, GSI_NEW_STMT);
 
   add_phi_arg (phi_str, str_3, single_succ_edge (bb4), UNKNOWN_LOCATION);
   add_phi_arg (phi_str, str_5, e55, UNKNOWN_LOCATION);
-  add_phi_arg (phi_i, i_3, single_succ_edge (bb4), UNKNOWN_LOCATION);
-  add_phi_arg (phi_i, i_5, e55, UNKNOWN_LOCATION);
+  add_phi_arg (phi_val, val_3, single_succ_edge (bb4), UNKNOWN_LOCATION);
+  add_phi_arg (phi_val, val_5, e55, UNKNOWN_LOCATION);
 
   /*
   <bb 6> [local count: 118111600]:
@@ -5341,41 +5241,41 @@ build_itoa_fn (void)
   /* Just build PHIs.  Add arguments after the gimple_build(...) API gives them
      to us.  */
   tree str_6 = make_ssa_name (str_param_decl);
-  tree i_6 = make_ssa_name (long_unsigned_type_node);
+  tree val_6 = make_ssa_name (long_unsigned_type_node);
   phi_str = create_phi_node (str_6, bb7);
-  phi_i = create_phi_node (i_6, bb7);
+  phi_val = create_phi_node (val_6, bb7);
 
   /* Build non-phi statements first.  Otherwise, we couldn't use the
      gimple_build (...) API.  */
   gsi = gsi_start_bb (bb7);
-  tree i_7 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-      TRUNC_DIV_EXPR, long_unsigned_type_node, i_6, build_int_cst (long_unsigned_type_node,
+  tree val_7 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+      TRUNC_DIV_EXPR, long_unsigned_type_node, val_6, build_int_cst (long_unsigned_type_node,
 	10));
   tree str_7 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
       POINTER_PLUS_EXPR, str_type, str_6, build_int_cst(size_type_node, -1));
-  tree i_8 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-      TRUNC_MOD_EXPR, long_unsigned_type_node, i_6,
+  tree val_8 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+      TRUNC_MOD_EXPR, long_unsigned_type_node, val_6,
       build_int_cst (long_unsigned_type_node, 10));
-  tree i_9 = gimple_convert (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-      unsigned_char_type_node, i_8);
-  tree i_10 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-      PLUS_EXPR, unsigned_char_type_node, i_9,
+  tree val_9 = gimple_convert (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+      unsigned_char_type_node, val_8);
+  tree val_10 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+      PLUS_EXPR, unsigned_char_type_node, val_9,
       build_int_cst (unsigned_char_type_node, 48));
-  tree i_11 = gimple_convert (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-      char_type_node, i_10);
+  tree val_11 = gimple_convert (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+      char_type_node, val_10);
   tree str_7_deref = build_simple_mem_ref (str_7);
   gassign *char_write =
-    gimple_build_assign (str_7_deref, i_11);
+    gimple_build_assign (str_7_deref, val_11);
   gsi_insert_after (&gsi, char_write, GSI_NEW_STMT);
   gcond *bb7_cond =
-    gimple_build_cond (GT_EXPR, i_6, build_int_cst (long_unsigned_type_node, 9),
+    gimple_build_cond (GT_EXPR, val_6, build_int_cst (long_unsigned_type_node, 9),
 	NULL, NULL);
   gsi_insert_after (&gsi, bb7_cond, GSI_NEW_STMT);
 
   add_phi_arg (phi_str, str_5, single_succ_edge (bb6), UNKNOWN_LOCATION);
   add_phi_arg (phi_str, str_7, e77, UNKNOWN_LOCATION);
-  add_phi_arg (phi_i, i_3, single_succ_edge (bb6), UNKNOWN_LOCATION);
-  add_phi_arg (phi_i, i_7, e77, UNKNOWN_LOCATION);
+  add_phi_arg (phi_val, val_3, single_succ_edge (bb6), UNKNOWN_LOCATION);
+  add_phi_arg (phi_val, val_7, e77, UNKNOWN_LOCATION);
 
   /*
   <bb 8> [local count: 118111600]:
