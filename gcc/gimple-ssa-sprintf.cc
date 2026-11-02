@@ -4618,7 +4618,7 @@ gimple_fold_builtin_sprintf (const call_info &info, gimple_stmt_iterator *gsi)
 		       using them and rely on COMDAT groups to be merged at
 		       link time, so do not optimize if the target doesn't
 		       support them.  */
-		    if (!SUPPORTS_ONE_ONLY)
+		    if (!supports_one_only ())
 		      return false;
 
 		    /* If it requires more precision than what we support, then
@@ -4811,14 +4811,12 @@ build_conversion_fn_decl (const char *name, tree val_type)
   DECL_IGNORED_P (fn_decl) = 1;
   DECL_DECLARED_INLINE_P (fn_decl) = 1;
 
-  /* Every translation unit using the function emits its own copy, so put
-     it in a COMDAT group for the linker to keep only one of them.  Make it
-     hidden so that each shared object binds to its own copy.  The callers
-     must enusre that the target supports COMDAT groups.  */
-  gcc_checking_assert (SUPPORTS_ONE_ONLY);
-  SET_DECL_ASSEMBLER_NAME (fn_decl, get_identifier (name));
-  DECL_COMDAT (fn_decl) = 1;
+  /* Every translation unit using the function emits its own copy.  To avoid
+     code bloat, make sure all those copies get linked into a single
+     instance.  */
+  gcc_checking_assert (supports_one_only ());
   make_decl_one_only (fn_decl, DECL_ASSEMBLER_NAME (fn_decl));
+
   DECL_VISIBILITY (fn_decl) = VISIBILITY_HIDDEN;
   DECL_VISIBILITY_SPECIFIED (fn_decl) = 1;
 
