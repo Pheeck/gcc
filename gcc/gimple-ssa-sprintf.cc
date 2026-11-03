@@ -4970,10 +4970,10 @@ build_utoa_fn (void)
   _3 = (size_t) _2;
   */
   gsi = gsi_start_bb (bb6);
-  tree written_1 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+  tree len_1 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
       POINTER_DIFF_EXPR, ptrdiff_type_node, str_5, str_1);
-  tree written_2 = gimple_convert (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-      size_type_node, written_1);
+  tree len_2 = gimple_convert (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+      size_type_node, len_1);
 
   /*
   <bb 7> [local count: 1073741824]:
@@ -5032,10 +5032,10 @@ build_utoa_fn (void)
 
   /*
   <bb 8> [local count: 118111600]:
-  return written_2;
+  return len_2;
   */
   gsi = gsi_start_bb (bb8);
-  greturn *return_stmt = gimple_build_return (written_2);
+  greturn *return_stmt = gimple_build_return (len_2);
   gsi_insert_after (&gsi, return_stmt, GSI_NEW_STMT);
 
   /* Finish building the function body.  */
@@ -5210,14 +5210,14 @@ build_itoa_fn (void)
   add_phi_arg (phi_val, val_5_2, e55, UNKNOWN_LOCATION);
 
   /* bb6 (compute length):
-     written_6_1 = str_5_2 - str_3_1;
-     written_6_2 = (size_t) written_6_1;
+     len_6_1 = str_5_2 - str_3_1;
+     len_6_2 = (size_t) len_6_1;
   */
   gsi = gsi_start_bb (bb6);
-  tree written_6_1 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+  tree len_6_1 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
       POINTER_DIFF_EXPR, ptrdiff_type_node, str_5_2, str_3_1);
-  tree written_6_2 = gimple_convert (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-      size_type_node, written_6_1);
+  tree len_6_2 = gimple_convert (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+      size_type_node, len_6_1);
 
   /* bb7 (write digits, loop):
      # str_7_1 = PHI <str_5_2(bb6), str_7_2(bb7)>
@@ -5274,10 +5274,10 @@ build_itoa_fn (void)
   add_phi_arg (phi_val, val_7_2, e77, UNKNOWN_LOCATION);
 
   /* bb8 (return):
-     return written_6_2;
+     return len_6_2;
   */
   gsi = gsi_start_bb (bb8);
-  greturn *return_stmt = gimple_build_return (written_6_2);
+  greturn *return_stmt = gimple_build_return (len_6_2);
   gsi_insert_after (&gsi, return_stmt, GSI_NEW_STMT);
 
   /* Finish building the function body.  */
