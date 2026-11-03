@@ -4853,8 +4853,14 @@ build_conversion_fn_decl (const char *name, tree val_type)
 }
 
 /* Emit an 'itoa' (SIGN true) or 'utoa' (SIGN false) function for the
-   target.  'itoa' has an extra bb2-bb4 prologue that writes a sign and
-   computes the absolute value; bb5-bb8 are shared between both.  */
+   target.
+
+   Given an unsigned long number and a string buffer, the 'utoa' function
+   fills out the buffer with the decimal string representation of that number.
+   Analogously for 'itoa' and signed longs.
+
+   'itoa' has an extra bb2-bb4 prologue that writes a sign and computes the
+   absolute value; bb5-bb8 are shared between both.  */
 
 static tree
 build_itoa_utoa_fn (bool sign)
