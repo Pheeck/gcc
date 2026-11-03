@@ -4941,7 +4941,6 @@ build_itoa_utoa_fn (bool sign)
   e78->probability = profile_probability::unlikely ();
 
   /* Fill out dominator and loop info.  */
-  // TODO Would be faster to do this manually
   calculate_dominance_info (CDI_DOMINATORS);
   class loop *bb5_loop = alloc_loop ();
   bb5_loop->header = bb5;
