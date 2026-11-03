@@ -4803,7 +4803,9 @@ build_conversion_fn_decl (const char *name, tree val_type)
   tree fn_type = build_function_type_list (size_type_node, str_type,
 					   val_type, NULL_TREE);
   tree fn_decl = build_decl (UNKNOWN_LOCATION, FUNCTION_DECL,
-			     get_identifier (name), fn_type);
+			     clone_identifier (get_identifier (name),
+					       "gcc_strlen"),
+			     fn_type);
 
   TREE_STATIC (fn_decl) = 1;
   TREE_USED (fn_decl) = 1;
@@ -4856,7 +4858,7 @@ build_conversion_fn_decl (const char *name, tree val_type)
 static tree
 build_utoa_fn (void)
 {
-  tree fn_decl = build_conversion_fn_decl ("utoa.0", long_unsigned_type_node);
+  tree fn_decl = build_conversion_fn_decl ("utoa", long_unsigned_type_node);
   tree str_param_decl = DECL_ARGUMENTS (fn_decl);
   tree str_type = TREE_TYPE (str_param_decl);
   tree val_param_decl = DECL_CHAIN (str_param_decl);
@@ -5052,7 +5054,7 @@ build_utoa_fn (void)
 static tree
 build_itoa_fn (void)
 {
-  tree fn_decl = build_conversion_fn_decl ("itoa.0", long_integer_type_node);
+  tree fn_decl = build_conversion_fn_decl ("itoa", long_integer_type_node);
   tree str_param_decl = DECL_ARGUMENTS (fn_decl);
   tree str_type = TREE_TYPE (str_param_decl);
   tree val_param_decl = DECL_CHAIN (str_param_decl);
