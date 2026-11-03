@@ -4971,9 +4971,10 @@ build_itoa_utoa_fn (bool sign)
       */
       gsi = gsi_start_bb (bb2);
       tree val_2 = get_or_create_ssa_default_def (cfun, val_param_decl);
-      gcond *bb2_cond =
-	gimple_build_cond (LT_EXPR, val_2, build_zero_cst (long_integer_type_node),
-	    NULL, NULL);
+      gcond *bb2_cond
+	= gimple_build_cond (LT_EXPR, val_2,
+			     build_zero_cst (long_integer_type_node), NULL,
+			     NULL);
       gsi_insert_after (&gsi, bb2_cond, GSI_NEW_STMT);
 
       /* bb3 (write sign, taken when val_2 < 0):
@@ -4982,12 +4983,14 @@ build_itoa_utoa_fn (bool sign)
       */
       gsi = gsi_start_bb (bb3);
       str_3_1 = get_or_create_ssa_default_def (cfun, str_param_decl);
-      tree str_3_2 =
-	gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-	    POINTER_PLUS_EXPR, str_type, str_3_1, build_one_cst (size_type_node));
+      tree str_3_2
+	= gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+			POINTER_PLUS_EXPR, str_type, str_3_1,
+			build_one_cst (size_type_node));
       tree str_3_1_deref = build_simple_mem_ref (str_3_1);
-      gassign *minus_write =
-	gimple_build_assign (str_3_1_deref, build_int_cst (char_type_node, 45));
+      gassign *minus_write
+	= gimple_build_assign (str_3_1_deref,
+			       build_int_cst (char_type_node, 45));
       gsi_insert_after (&gsi, minus_write, GSI_NEW_STMT);
 
       /* bb4 (digit setup, merge point):
@@ -5027,14 +5030,18 @@ build_itoa_utoa_fn (bool sign)
   phi_val = create_phi_node (val_5_1, bb5);
 
   gsi = gsi_start_bb (bb5);
-  tree val_5_2 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-      TRUNC_DIV_EXPR, long_unsigned_type_node, val_5_1, build_int_cst (long_unsigned_type_node,
-	10));
-  tree str_5_2 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-      POINTER_PLUS_EXPR, str_type, str_5_1, build_one_cst (size_type_node));
-  gcond *bb5_cond =
-    gimple_build_cond (GT_EXPR, val_5_1, build_int_cst (long_unsigned_type_node, 9),
-	NULL, NULL);
+  tree val_5_2
+    = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+		    TRUNC_DIV_EXPR, long_unsigned_type_node, val_5_1,
+		    build_int_cst (long_unsigned_type_node, 10));
+  tree str_5_2
+    = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+		    POINTER_PLUS_EXPR, str_type, str_5_1,
+		    build_one_cst (size_type_node));
+  gcond *bb5_cond
+    = gimple_build_cond (GT_EXPR, val_5_1,
+			 build_int_cst (long_unsigned_type_node, 9), NULL,
+			 NULL);
   gsi_insert_after (&gsi, bb5_cond, GSI_NEW_STMT);
 
   add_phi_arg (phi_str, str_4, e45, UNKNOWN_LOCATION);
@@ -5047,10 +5054,13 @@ build_itoa_utoa_fn (bool sign)
      len_6_2 = (size_t) len_6_1;
   */
   gsi = gsi_start_bb (bb6);
-  tree len_6_1 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-      POINTER_DIFF_EXPR, ptrdiff_type_node, str_5_2, sign ? str_3_1 : str_4);
-  tree len_6_2 = gimple_convert (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-      size_type_node, len_6_1);
+  tree len_6_1
+    = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+		    POINTER_DIFF_EXPR, ptrdiff_type_node, str_5_2,
+		    sign ? str_3_1 : str_4);
+  tree len_6_2
+    = gimple_convert (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+		      size_type_node, len_6_1);
 
   /* bb7 (write digits, loop):
      # str_7_1 = PHI <str_5_2(bb6), str_7_2(bb7)>
@@ -5075,28 +5085,34 @@ build_itoa_utoa_fn (bool sign)
   phi_val = create_phi_node (val_7_1, bb7);
 
   gsi = gsi_start_bb (bb7);
-  tree val_7_2 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-      TRUNC_DIV_EXPR, long_unsigned_type_node, val_7_1, build_int_cst (long_unsigned_type_node,
-	10));
-  tree str_7_2 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-      POINTER_PLUS_EXPR, str_type, str_7_1, size_int (-1));
-  tree val_7_3 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-      TRUNC_MOD_EXPR, long_unsigned_type_node, val_7_1,
-      build_int_cst (long_unsigned_type_node, 10));
-  tree val_7_4 = gimple_convert (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-      unsigned_char_type_node, val_7_3);
-  tree val_7_5 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-      PLUS_EXPR, unsigned_char_type_node, val_7_4,
-      build_int_cst (unsigned_char_type_node, 48));
-  tree val_7_6 = gimple_convert (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-      char_type_node, val_7_5);
+  tree val_7_2
+    = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+		    TRUNC_DIV_EXPR, long_unsigned_type_node, val_7_1,
+		    build_int_cst (long_unsigned_type_node, 10));
+  tree str_7_2
+    = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+		    POINTER_PLUS_EXPR, str_type, str_7_1, size_int (-1));
+  tree val_7_3
+    = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+		    TRUNC_MOD_EXPR, long_unsigned_type_node, val_7_1,
+		    build_int_cst (long_unsigned_type_node, 10));
+  tree val_7_4
+    = gimple_convert (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+		      unsigned_char_type_node, val_7_3);
+  tree val_7_5
+    = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION, PLUS_EXPR,
+		    unsigned_char_type_node, val_7_4,
+		    build_int_cst (unsigned_char_type_node, 48));
+  tree val_7_6
+    = gimple_convert (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+		      char_type_node, val_7_5);
   tree str_7_2_deref = build_simple_mem_ref (str_7_2);
-  gassign *char_write =
-    gimple_build_assign (str_7_2_deref, val_7_6);
+  gassign *char_write = gimple_build_assign (str_7_2_deref, val_7_6);
   gsi_insert_after (&gsi, char_write, GSI_NEW_STMT);
-  gcond *bb7_cond =
-    gimple_build_cond (GT_EXPR, val_7_1, build_int_cst (long_unsigned_type_node, 9),
-	NULL, NULL);
+  gcond *bb7_cond
+    = gimple_build_cond (GT_EXPR, val_7_1,
+			 build_int_cst (long_unsigned_type_node, 9), NULL,
+			 NULL);
   gsi_insert_after (&gsi, bb7_cond, GSI_NEW_STMT);
 
   add_phi_arg (phi_str, str_5_2, single_succ_edge (bb6), UNKNOWN_LOCATION);
