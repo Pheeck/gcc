@@ -5009,8 +5009,9 @@ build_itoa_utoa_fn (bool sign)
       add_phi_arg (phi_str, str_3_2, single_succ_edge (bb3), UNKNOWN_LOCATION);
 
       gsi = gsi_start_bb (bb4);
-      val_4 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-	  ABSU_EXPR, long_unsigned_type_node, val_2);
+      val_4
+	= gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION, ABSU_EXPR,
+			long_unsigned_type_node, val_2);
     }
   else
     {
