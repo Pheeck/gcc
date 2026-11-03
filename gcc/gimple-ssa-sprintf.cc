@@ -5075,8 +5075,6 @@ build_itoa_utoa_fn (bool sign)
   phi_str = create_phi_node (str_7_1, bb7);
   phi_val = create_phi_node (val_7_1, bb7);
 
-  /* Build non-phi statements first.  Otherwise, we couldn't use the
-     gimple_build (...) API.  */
   gsi = gsi_start_bb (bb7);
   tree val_7_2 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
       TRUNC_DIV_EXPR, long_unsigned_type_node, val_7_1, build_int_cst (long_unsigned_type_node,
