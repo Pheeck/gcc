@@ -5136,157 +5136,148 @@ build_itoa_fn (void)
   gimple_stmt_iterator gsi;
   gphi *phi_val, *phi_str;
 
-  // TODO make the bb comments nicer
-  /*
-  <bb 2> [local count: 118111600]:
-  if (val_16(D) < 0)
-    goto <bb 3>; [41.00%]
-  else
-    goto <bb 4>; [59.00%]
+  /* bb2 (sign test):
+     if (val_2 < 0)
+       goto <bb 3>;  [unlikely]
+     else
+       goto <bb 4>;  [likely]
   */
   gsi = gsi_start_bb (bb2);
-  tree val_1 = get_or_create_ssa_default_def (cfun, val_param_decl);
+  tree val_2 = get_or_create_ssa_default_def (cfun, val_param_decl);
   gcond *bb2_cond =
-    gimple_build_cond (LT_EXPR, val_1, build_zero_cst (long_integer_type_node),
+    gimple_build_cond (LT_EXPR, val_2, build_zero_cst (long_integer_type_node),
 	NULL, NULL);
   gsi_insert_after (&gsi, bb2_cond, GSI_NEW_STMT);
 
-  /* Output the minus sign
-  <bb 3> [local count: 48425756]:
-  _50 = str_15(D) + 1;
-  *str_15(D) = 45;
+  /* bb3 (write sign, taken when val_2 < 0):
+     str_3_2 = str_3_1 + 1;
+     *str_3_1 = '-';
   */
   gsi = gsi_start_bb (bb3);
-  tree str_1 = get_or_create_ssa_default_def (cfun, str_param_decl);
-  tree str_2 =
+  tree str_3_1 = get_or_create_ssa_default_def (cfun, str_param_decl);
+  tree str_3_2 =
     gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-	POINTER_PLUS_EXPR, str_type, str_1, build_one_cst (size_type_node));
-  tree str_1_deref = build_simple_mem_ref (str_1);
+	POINTER_PLUS_EXPR, str_type, str_3_1, build_one_cst (size_type_node));
+  tree str_3_1_deref = build_simple_mem_ref (str_3_1);
   gassign *minus_write =
-    gimple_build_assign (str_1_deref, build_int_cst (char_type_node, 45));
+    gimple_build_assign (str_3_1_deref, build_int_cst (char_type_node, 45));
   gsi_insert_after (&gsi, minus_write, GSI_NEW_STMT);
 
-  /*
-  <bb 4> [local count: 118111600]:
-  # str_8 = PHI <str_15(D)(2), _50(3)>
-  u_20 = ABSU_EXPR <i_16(D)>;
+  /* bb4 (digit setup, merge point):
+     # str_4 = PHI <str_3_1(bb2), str_3_2(bb3)>
+     val_4 = ABSU_EXPR (val_2);
   */
-  tree str_3 = make_ssa_name (str_param_decl);
-  phi_str = create_phi_node (str_3, bb4);
-  add_phi_arg (phi_str, str_1, e24, UNKNOWN_LOCATION);
-  add_phi_arg (phi_str, str_2, single_succ_edge (bb3), UNKNOWN_LOCATION);
+  tree str_4 = make_ssa_name (str_param_decl);
+  phi_str = create_phi_node (str_4, bb4);
+  add_phi_arg (phi_str, str_3_1, e24, UNKNOWN_LOCATION);
+  add_phi_arg (phi_str, str_3_2, single_succ_edge (bb3), UNKNOWN_LOCATION);
 
   gsi = gsi_start_bb (bb4);
-  // TODO there's no val_2, I can shift all val_* number down by one
-  tree val_3 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-      ABSU_EXPR, long_unsigned_type_node, val_1);
+  tree val_4 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+      ABSU_EXPR, long_unsigned_type_node, val_2);
 
-  /*
-  <bb 5> [local count: 1073741824]:
-  # str_9 = PHI <str_8(4), str_22(5)>
-  # u3_11 = PHI <u_20(4), u3_21(5)>
-  u3_21 = u3_11 / 10;
-  str_22 = str_9 + 1;
-  if (u3_11 > 9)
-    goto <bb 5>; [89.00%]
-  else
-    goto <bb 6>; [11.00%]
+  /* bb5 (count digits, loop):
+     # str_5_1 = PHI <str_4(bb4), str_5_2(bb5)>
+     # val_5_1 = PHI <val_4(bb4), val_5_2(bb5)>
+     val_5_2 = val_5_1 / 10;
+     str_5_2 = str_5_1 + 1;
+     if (val_5_1 > 9)
+       goto <bb 5>;  [likely]
+     else
+       goto <bb 6>;  [unlikely]
   */
   /* Just build PHIs.  Add arguments after the gimple_build(...) API gives them
      to us.  */
-  tree str_4 = make_ssa_name (str_param_decl);
-  tree val_4 = make_ssa_name (long_unsigned_type_node);
-  phi_str = create_phi_node (str_4, bb5);
-  phi_val = create_phi_node (val_4, bb5);
+  tree str_5_1 = make_ssa_name (str_param_decl);
+  tree val_5_1 = make_ssa_name (long_unsigned_type_node);
+  phi_str = create_phi_node (str_5_1, bb5);
+  phi_val = create_phi_node (val_5_1, bb5);
 
   gsi = gsi_start_bb (bb5);
-  tree val_5 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-      TRUNC_DIV_EXPR, long_unsigned_type_node, val_4, build_int_cst (long_unsigned_type_node,
+  tree val_5_2 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+      TRUNC_DIV_EXPR, long_unsigned_type_node, val_5_1, build_int_cst (long_unsigned_type_node,
 	10));
-  tree str_5 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-      POINTER_PLUS_EXPR, str_type, str_4, build_one_cst (size_type_node));
+  tree str_5_2 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+      POINTER_PLUS_EXPR, str_type, str_5_1, build_one_cst (size_type_node));
   gcond *bb5_cond =
-    gimple_build_cond (GT_EXPR, val_4, build_int_cst (long_unsigned_type_node, 9),
+    gimple_build_cond (GT_EXPR, val_5_1, build_int_cst (long_unsigned_type_node, 9),
 	NULL, NULL);
   gsi_insert_after (&gsi, bb5_cond, GSI_NEW_STMT);
 
-  add_phi_arg (phi_str, str_3, single_succ_edge (bb4), UNKNOWN_LOCATION);
-  add_phi_arg (phi_str, str_5, e55, UNKNOWN_LOCATION);
-  add_phi_arg (phi_val, val_3, single_succ_edge (bb4), UNKNOWN_LOCATION);
-  add_phi_arg (phi_val, val_5, e55, UNKNOWN_LOCATION);
+  add_phi_arg (phi_str, str_4, single_succ_edge (bb4), UNKNOWN_LOCATION);
+  add_phi_arg (phi_str, str_5_2, e55, UNKNOWN_LOCATION);
+  add_phi_arg (phi_val, val_4, single_succ_edge (bb4), UNKNOWN_LOCATION);
+  add_phi_arg (phi_val, val_5_2, e55, UNKNOWN_LOCATION);
 
-  /*
-  <bb 6> [local count: 118111600]:
-  _2 = str_22 - str_15(D);
-  _3 = (size_t) _2;
+  /* bb6 (compute length):
+     written_6_1 = str_5_2 - str_3_1;
+     written_6_2 = (size_t) written_6_1;
   */
   gsi = gsi_start_bb (bb6);
-  tree written_1 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-      POINTER_DIFF_EXPR, ptrdiff_type_node, str_5, str_1);
-  tree written_2 = gimple_convert (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-      size_type_node, written_1);
+  tree written_6_1 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+      POINTER_DIFF_EXPR, ptrdiff_type_node, str_5_2, str_3_1);
+  tree written_6_2 = gimple_convert (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+      size_type_node, written_6_1);
 
-  /*
-  <bb 7> [local count: 1073741824]:
-  # str_10 = PHI <str_22(6), str_25(7)>
-  # u3_12 = PHI <u_20(6), u3_24(7)>
-  u3_24 = u3_12 / 10;
-  str_25 = str_10 + 18446744073709551615; // minus one
-  _4 = u3_12 % 10;
-  _5 = (unsigned char) _4; // why this conversion?
-  _6 = _5 + 48;
-  _7 = (char) _6;
-  MEM[(char *)str_25] = _7;
-  if (u3_12 > 9)
-    goto <bb 7>; [89.00%]
-  else
-    goto <bb 8>; [11.00%]
+  /* bb7 (write digits, loop):
+     # str_7_1 = PHI <str_5_2(bb6), str_7_2(bb7)>
+     # val_7_1 = PHI <val_4(bb6), val_7_2(bb7)>
+     val_7_2 = val_7_1 / 10;
+     str_7_2 = str_7_1 - 1;
+     val_7_3 = val_7_1 % 10;
+     val_7_4 = (unsigned char) val_7_3;
+     val_7_5 = val_7_4 + 48;
+     val_7_6 = (char) val_7_5;
+     *str_7_2 = val_7_6;
+     if (val_7_1 > 9)
+       goto <bb 7>;  [likely]
+     else
+       goto <bb 8>;  [unlikely]
   */
   /* Just build PHIs.  Add arguments after the gimple_build(...) API gives them
      to us.  */
-  tree str_6 = make_ssa_name (str_param_decl);
-  tree val_6 = make_ssa_name (long_unsigned_type_node);
-  phi_str = create_phi_node (str_6, bb7);
-  phi_val = create_phi_node (val_6, bb7);
+  tree str_7_1 = make_ssa_name (str_param_decl);
+  tree val_7_1 = make_ssa_name (long_unsigned_type_node);
+  phi_str = create_phi_node (str_7_1, bb7);
+  phi_val = create_phi_node (val_7_1, bb7);
 
   /* Build non-phi statements first.  Otherwise, we couldn't use the
      gimple_build (...) API.  */
   gsi = gsi_start_bb (bb7);
-  tree val_7 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-      TRUNC_DIV_EXPR, long_unsigned_type_node, val_6, build_int_cst (long_unsigned_type_node,
+  tree val_7_2 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+      TRUNC_DIV_EXPR, long_unsigned_type_node, val_7_1, build_int_cst (long_unsigned_type_node,
 	10));
-  tree str_7 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-      POINTER_PLUS_EXPR, str_type, str_6, size_int (-1));
-  tree val_8 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-      TRUNC_MOD_EXPR, long_unsigned_type_node, val_6,
+  tree str_7_2 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+      POINTER_PLUS_EXPR, str_type, str_7_1, size_int (-1));
+  tree val_7_3 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+      TRUNC_MOD_EXPR, long_unsigned_type_node, val_7_1,
       build_int_cst (long_unsigned_type_node, 10));
-  tree val_9 = gimple_convert (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-      unsigned_char_type_node, val_8);
-  tree val_10 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-      PLUS_EXPR, unsigned_char_type_node, val_9,
+  tree val_7_4 = gimple_convert (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+      unsigned_char_type_node, val_7_3);
+  tree val_7_5 = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+      PLUS_EXPR, unsigned_char_type_node, val_7_4,
       build_int_cst (unsigned_char_type_node, 48));
-  tree val_11 = gimple_convert (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-      char_type_node, val_10);
-  tree str_7_deref = build_simple_mem_ref (str_7);
+  tree val_7_6 = gimple_convert (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+      char_type_node, val_7_5);
+  tree str_7_2_deref = build_simple_mem_ref (str_7_2);
   gassign *char_write =
-    gimple_build_assign (str_7_deref, val_11);
+    gimple_build_assign (str_7_2_deref, val_7_6);
   gsi_insert_after (&gsi, char_write, GSI_NEW_STMT);
   gcond *bb7_cond =
-    gimple_build_cond (GT_EXPR, val_6, build_int_cst (long_unsigned_type_node, 9),
+    gimple_build_cond (GT_EXPR, val_7_1, build_int_cst (long_unsigned_type_node, 9),
 	NULL, NULL);
   gsi_insert_after (&gsi, bb7_cond, GSI_NEW_STMT);
 
-  add_phi_arg (phi_str, str_5, single_succ_edge (bb6), UNKNOWN_LOCATION);
-  add_phi_arg (phi_str, str_7, e77, UNKNOWN_LOCATION);
-  add_phi_arg (phi_val, val_3, single_succ_edge (bb6), UNKNOWN_LOCATION);
-  add_phi_arg (phi_val, val_7, e77, UNKNOWN_LOCATION);
+  add_phi_arg (phi_str, str_5_2, single_succ_edge (bb6), UNKNOWN_LOCATION);
+  add_phi_arg (phi_str, str_7_2, e77, UNKNOWN_LOCATION);
+  add_phi_arg (phi_val, val_4, single_succ_edge (bb6), UNKNOWN_LOCATION);
+  add_phi_arg (phi_val, val_7_2, e77, UNKNOWN_LOCATION);
 
-  /*
-  <bb 8> [local count: 118111600]:
-  return written_2;
+  /* bb8 (return):
+     return written_6_2;
   */
   gsi = gsi_start_bb (bb8);
-  greturn *return_stmt = gimple_build_return (written_2);
+  greturn *return_stmt = gimple_build_return (written_6_2);
   gsi_insert_after (&gsi, return_stmt, GSI_NEW_STMT);
 
   /* Finish building the function body.  */
