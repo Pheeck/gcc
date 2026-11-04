@@ -5074,11 +5074,10 @@ build_itoa_utoa_fn (bool sign)
      # val_7_1 = PHI <val_4(bb6), val_7_2(bb7)>
      val_7_2 = val_7_1 / 10;
      val_7_3 = val_7_1 % 10;
-     val_7_4 = (unsigned char) val_7_3;
-     val_7_5 = val_7_4 + 48;
-     val_7_6 = (char) val_7_5;
+     val_7_4 = val_7_4 + 48;
+     val_7_5 = (char) val_7_4;
      str_7_2 = str_7_1 - 1;
-     *str_7_2 = val_7_6;
+     *str_7_2 = val_7_5;
      if (val_7_1 > 9)
        goto <bb 7>;  [likely]
      else
@@ -5101,20 +5100,17 @@ build_itoa_utoa_fn (bool sign)
 		    TRUNC_MOD_EXPR, long_unsigned_type_node, val_7_1,
 		    build_int_cst (long_unsigned_type_node, 10));
   tree val_7_4
-    = gimple_convert (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-		      unsigned_char_type_node, val_7_3);
-  tree val_7_5
     = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION, PLUS_EXPR,
 		    unsigned_char_type_node, val_7_4,
 		    build_int_cst (unsigned_char_type_node, 48));
-  tree val_7_6
+  tree val_7_5
     = gimple_convert (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-		      char_type_node, val_7_5);
+		      char_type_node, val_7_4);
   tree str_7_2
     = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
 		    POINTER_PLUS_EXPR, str_type, str_7_1, size_int (-1));
   tree str_7_2_deref = build_simple_mem_ref (str_7_2);
-  gassign *char_write = gimple_build_assign (str_7_2_deref, val_7_6);
+  gassign *char_write = gimple_build_assign (str_7_2_deref, val_7_5);
   gsi_insert_after (&gsi, char_write, GSI_NEW_STMT);
   gcond *bb7_cond
     = gimple_build_cond (GT_EXPR, val_7_1,
