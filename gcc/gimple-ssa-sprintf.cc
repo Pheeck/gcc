@@ -5074,7 +5074,7 @@ build_itoa_utoa_fn (bool sign)
      # val_7_1 = PHI <val_4(bb6), val_7_2(bb7)>
      val_7_2 = val_7_1 / 10;
      val_7_3 = val_7_1 % 10;
-     val_7_4 = val_7_4 + 48;
+     val_7_4 = val_7_3 + 48;
      val_7_5 = (char) val_7_4;
      str_7_2 = str_7_1 - 1;
      *str_7_2 = val_7_5;
@@ -5101,8 +5101,8 @@ build_itoa_utoa_fn (bool sign)
 		    build_int_cst (long_unsigned_type_node, 10));
   tree val_7_4
     = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION, PLUS_EXPR,
-		    unsigned_char_type_node, val_7_4,
-		    build_int_cst (unsigned_char_type_node, 48));
+		    long_unsigned_type_node, val_7_3,
+		    build_int_cst (long_unsigned_type_node, 48));
   tree val_7_5
     = gimple_convert (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
 		      char_type_node, val_7_4);
