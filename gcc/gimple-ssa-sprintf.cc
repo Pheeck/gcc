@@ -4962,6 +4962,7 @@ build_itoa_utoa_fn (bool sign)
 
   /* Insert GIMPLE statements.  */
   gimple_stmt_iterator gsi;
+  gimple_seq seq;
   gphi *phi_val, *phi_str;
 
   /* str_3_1 only exists for itoa.  str_4/val_4 are set up differently by each
@@ -5032,27 +5033,31 @@ build_itoa_utoa_fn (bool sign)
      else
        goto <bb 6>;  [unlikely]
   */
-  /* Just build PHIs.  Add arguments after the gimple_build(...) API gives them
-     to us.  */
   tree str_5_1 = make_ssa_name (str_param_decl);
   tree val_5_1 = make_ssa_name (long_unsigned_type_node);
   phi_str = create_phi_node (str_5_1, bb5);
   phi_val = create_phi_node (val_5_1, bb5);
 
-  gsi = gsi_start_bb (bb5);
+  /* We have to work on a gimple sequence ("freestanding" statements) instead
+     of directly on the basic block.  Since the basic block forms a loop, we'll
+     be working with statements referencing SSA names that lack definitions or
+     referencing incomplete PHIs.  Thus we want to limit the folding that
+     'gimple_build' API does.  It shouldn't inspect these "invalid references".
+     We achieve this using gimple sequences.  */
+  seq = NULL;
   tree val_5_2
-    = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-		    TRUNC_DIV_EXPR, long_unsigned_type_node, val_5_1,
+    = gimple_build (&seq, TRUNC_DIV_EXPR, long_unsigned_type_node, val_5_1,
 		    build_int_cst (long_unsigned_type_node, 10));
   tree str_5_2
-    = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-		    POINTER_PLUS_EXPR, str_type, str_5_1,
+    = gimple_build (&seq, POINTER_PLUS_EXPR, str_type, str_5_1,
 		    build_one_cst (size_type_node));
   gcond *bb5_cond
     = gimple_build_cond (GT_EXPR, val_5_1,
 			 build_int_cst (long_unsigned_type_node, 9), NULL,
 			 NULL);
-  gsi_insert_after (&gsi, bb5_cond, GSI_NEW_STMT);
+  gimple_seq_add_stmt (&seq, bb5_cond);
+  gsi = gsi_start_bb (bb5);
+  gsi_insert_seq_after (&gsi, seq, GSI_LAST_NEW_STMT);
 
   add_phi_arg (phi_str, str_4, e45, UNKNOWN_LOCATION);
   add_phi_arg (phi_str, str_5_2, e55, UNKNOWN_LOCATION);
@@ -5093,33 +5098,29 @@ build_itoa_utoa_fn (bool sign)
   phi_str = create_phi_node (str_7_1, bb7);
   phi_val = create_phi_node (val_7_1, bb7);
 
-  gsi = gsi_start_bb (bb7);
+  seq = NULL;
   tree val_7_2
-    = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-		    TRUNC_DIV_EXPR, long_unsigned_type_node, val_7_1,
+    = gimple_build (&seq, TRUNC_DIV_EXPR, long_unsigned_type_node, val_7_1,
 		    build_int_cst (long_unsigned_type_node, 10));
   tree val_7_3
-    = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-		    TRUNC_MOD_EXPR, long_unsigned_type_node, val_7_1,
+    = gimple_build (&seq, TRUNC_MOD_EXPR, long_unsigned_type_node, val_7_1,
 		    build_int_cst (long_unsigned_type_node, 10));
   tree val_7_4
-    = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION, PLUS_EXPR,
-		    long_unsigned_type_node, val_7_3,
+    = gimple_build (&seq, PLUS_EXPR, long_unsigned_type_node, val_7_3,
 		    build_int_cst (long_unsigned_type_node, 48));
-  tree val_7_5
-    = gimple_convert (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-		      char_type_node, val_7_4);
+  tree val_7_5 = gimple_convert (&seq, char_type_node, val_7_4);
   tree str_7_2
-    = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-		    POINTER_PLUS_EXPR, str_type, str_7_1, size_int (-1));
+    = gimple_build (&seq, POINTER_PLUS_EXPR, str_type, str_7_1, size_int (-1));
   tree str_7_2_deref = build_simple_mem_ref (str_7_2);
   gassign *char_write = gimple_build_assign (str_7_2_deref, val_7_5);
-  gsi_insert_after (&gsi, char_write, GSI_NEW_STMT);
+  gimple_seq_add_stmt (&seq, char_write);
   gcond *bb7_cond
     = gimple_build_cond (GT_EXPR, val_7_1,
 			 build_int_cst (long_unsigned_type_node, 9), NULL,
 			 NULL);
-  gsi_insert_after (&gsi, bb7_cond, GSI_NEW_STMT);
+  gimple_seq_add_stmt (&seq, bb7_cond);
+  gsi = gsi_start_bb (bb7);
+  gsi_insert_seq_after (&gsi, seq, GSI_LAST_NEW_STMT);
 
   add_phi_arg (phi_str, str_5_2, single_succ_edge (bb6), UNKNOWN_LOCATION);
   add_phi_arg (phi_str, str_7_2, e77, UNKNOWN_LOCATION);
