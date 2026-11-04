@@ -4983,7 +4983,7 @@ build_itoa_utoa_fn (bool sign)
 			     NULL);
       gsi_insert_after (&gsi, bb2_cond, GSI_NEW_STMT);
 
-      /* bb3 (write sign, taken when val_2 < 0):
+      /* bb3 (write sign):
 	 str_3_2 = str_3_1 + 1;
 	 *str_3_1 = '-';
       */
@@ -4999,7 +4999,7 @@ build_itoa_utoa_fn (bool sign)
 			       build_int_cst (char_type_node, 45));
       gsi_insert_after (&gsi, minus_write, GSI_NEW_STMT);
 
-      /* bb4 (digit setup, merge point):
+      /* bb4 (apply absolute value):
 	 # str_4 = PHI <str_3_1(bb2), str_3_2(bb3)>
 	 val_4 = ABSU_EXPR (val_2);
       */
@@ -5019,7 +5019,7 @@ build_itoa_utoa_fn (bool sign)
       val_4 = get_or_create_ssa_default_def (cfun, val_param_decl);
     }
 
-  /* bb5 (count digits, loop):
+  /* bb5 (count digits):
      # str_5_1 = PHI <str_4(bb4), str_5_2(bb5)>
      # val_5_1 = PHI <val_4(bb4), val_5_2(bb5)>
      val_5_2 = val_5_1 / 10;
@@ -5069,7 +5069,7 @@ build_itoa_utoa_fn (bool sign)
     = gimple_convert (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
 		      size_type_node, len_6_1);
 
-  /* bb7 (write digits, loop):
+  /* bb7 (write digits):
      # str_7_1 = PHI <str_5_2(bb6), str_7_2(bb7)>
      # val_7_1 = PHI <val_4(bb6), val_7_2(bb7)>
      val_7_2 = val_7_1 / 10;
@@ -5127,7 +5127,7 @@ build_itoa_utoa_fn (bool sign)
   add_phi_arg (phi_val, val_4, single_succ_edge (bb6), UNKNOWN_LOCATION);
   add_phi_arg (phi_val, val_7_2, e77, UNKNOWN_LOCATION);
 
-  /* bb8 (return):
+  /* bb8:
      return len_6_2;
   */
   gsi = gsi_start_bb (bb8);
