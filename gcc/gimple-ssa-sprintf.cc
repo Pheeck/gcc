@@ -4984,19 +4984,19 @@ build_itoa_utoa_fn (bool sign)
       gsi_insert_after (&gsi, bb2_cond, GSI_NEW_STMT);
 
       /* bb3 (write sign):
-	 str_3_2 = str_3_1 + 1;
 	 *str_3_1 = '-';
+	 str_3_2 = str_3_1 + 1;
       */
       gsi = gsi_start_bb (bb3);
       str_3_1 = get_or_create_ssa_default_def (cfun, str_param_decl);
-      tree str_3_2
-	= gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-			POINTER_PLUS_EXPR, str_type, str_3_1,
-			build_one_cst (size_type_node));
       tree str_3_1_deref = build_simple_mem_ref (str_3_1);
       gassign *minus_write
 	= gimple_build_assign (str_3_1_deref,
 			       build_int_cst (char_type_node, 45));
+      tree str_3_2
+	= gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+			POINTER_PLUS_EXPR, str_type, str_3_1,
+			build_one_cst (size_type_node));
       gsi_insert_after (&gsi, minus_write, GSI_NEW_STMT);
 
       /* bb4 (apply absolute value):
@@ -5073,11 +5073,11 @@ build_itoa_utoa_fn (bool sign)
      # str_7_1 = PHI <str_5_2(bb6), str_7_2(bb7)>
      # val_7_1 = PHI <val_4(bb6), val_7_2(bb7)>
      val_7_2 = val_7_1 / 10;
-     str_7_2 = str_7_1 - 1;
      val_7_3 = val_7_1 % 10;
      val_7_4 = (unsigned char) val_7_3;
      val_7_5 = val_7_4 + 48;
      val_7_6 = (char) val_7_5;
+     str_7_2 = str_7_1 - 1;
      *str_7_2 = val_7_6;
      if (val_7_1 > 9)
        goto <bb 7>;  [likely]
@@ -5096,9 +5096,6 @@ build_itoa_utoa_fn (bool sign)
     = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
 		    TRUNC_DIV_EXPR, long_unsigned_type_node, val_7_1,
 		    build_int_cst (long_unsigned_type_node, 10));
-  tree str_7_2
-    = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
-		    POINTER_PLUS_EXPR, str_type, str_7_1, size_int (-1));
   tree val_7_3
     = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
 		    TRUNC_MOD_EXPR, long_unsigned_type_node, val_7_1,
@@ -5113,6 +5110,9 @@ build_itoa_utoa_fn (bool sign)
   tree val_7_6
     = gimple_convert (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
 		      char_type_node, val_7_5);
+  tree str_7_2
+    = gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
+		    POINTER_PLUS_EXPR, str_type, str_7_1, size_int (-1));
   tree str_7_2_deref = build_simple_mem_ref (str_7_2);
   gassign *char_write = gimple_build_assign (str_7_2_deref, val_7_6);
   gsi_insert_after (&gsi, char_write, GSI_NEW_STMT);
