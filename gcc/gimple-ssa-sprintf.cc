@@ -5041,9 +5041,19 @@ build_itoa_utoa_fn (bool sign)
   /* We have to work on a gimple sequence ("freestanding" statements) instead
      of directly on the basic block.  Since the basic block forms a loop, we'll
      be working with statements referencing SSA names that lack definitions or
-     referencing incomplete PHIs.  Thus we want to limit the folding that
+     referencing incomplete PHIs.  Thus we want to limit the folding that the
      'gimple_build' API does.  It shouldn't inspect these "invalid references".
-     We achieve this using gimple sequences.  */
+     We achieve this using gimple sequences.
+
+     FIXME According to the comment at 'gimple-fold.cc:gimple_build()', this
+     approach should work.  However, I've seen this approach fail when I built
+     slightly different gimple statements.  The gimple_build API can end up
+     calling 'tree_single_nonnegative_p()' which can end up inspecting an
+     incomplete PHI and segfaulting.  I'm making this note here for two
+     reasons: 1. To warn people taking inspiration from this code.  2. To
+     document this bug in case it starts happening on this code -- which I
+     guess is possible if there are changes to the gimple folding
+     infrastructure.  */
   seq = NULL;
   tree val_5_2
     = gimple_build (&seq, TRUNC_DIV_EXPR, long_unsigned_type_node, val_5_1,
