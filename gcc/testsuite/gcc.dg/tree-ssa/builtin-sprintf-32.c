@@ -1,5 +1,7 @@
 /* Verify which sprintf calls are folded into sequences of memcpy calls
-   and which are left alone.
+   and which are left alone.  Integer directives whose arguments are not
+   known at compile time are tested in builtin-sprintf-35.c and
+   builtin-sprintf-36.c.
    { dg-do compile }
    { dg-options "-O2 -Wno-format -fno-printf-return-value -fdump-tree-optimized" } */
 
@@ -69,18 +71,6 @@ void f_mixed (char *d, const char *s)
   sprintf (d, "%d:%s:%u", -1, s, 2u);
 }
 
-/* Integers not known at compile time are converted by calls to __itoa.  */
-
-void f_d_var (char *d, int i)
-{
-  sprintf (d, "%d", i);
-}
-
-void f_mixed_var (char *d, const char *s, int i)
-{
-  sprintf (d, "%s%d", s, i);
-}
-
 /* { dg-final { scan-tree-dump-times "__builtin_strnlen" 1 "optimized" } } */
 
 /* Calls expected not to be folded because we don't support these formats so
@@ -143,7 +133,4 @@ int g_s_ret (char *d, const char *s)
   return sprintf (d, "%s", s);
 }
 
-/* __itoa and __utoa are only emitted on targets supporting COMDAT groups,
-   otherwise f_d_var and f_mixed_var are not folded.
-   { dg-final { scan-tree-dump-times "sprintf \\(" 11 "optimized" { target comdat_group } } }
-   { dg-final { scan-tree-dump-times "sprintf \\(" 13 "optimized" { target { ! comdat_group } } } } */
+/* { dg-final { scan-tree-dump-times "sprintf \\(" 11 "optimized" } } */

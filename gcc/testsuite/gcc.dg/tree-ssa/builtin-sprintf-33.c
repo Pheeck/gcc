@@ -1,10 +1,10 @@
 /* Verify that sprintf calls with integer directives whose arguments are not
-   known at compile time, which are folded into calls to the __itoa and
-   __utoa functions emitted by the sprintf pass, produce the same output and
+   known at compile time, which are folded into calls to the itoa and utoa
+   functions emitted by the sprintf optimizations, produce the same output and
    the same return value as the library sprintf.  -fno-printf-return-value
-   prevents the return value from being replaced by a constant computed by
-   the sprintf pass so that the value computed by the folded sequence is the
-   one being checked.
+   prevents the return value from being replaced by a constant computed by the
+   sprintf optimizations so that the value computed by the folded sequence is
+   the one being checked.
    { dg-do run }
    { dg-options "-O2 -Wno-format -fno-printf-return-value" } */
 
@@ -102,7 +102,7 @@ check (int line, const char *buf, int n, const char *expect)
     V (expect, __VA_ARGS__);					\
   } while (0)
 
-/* Signed directives, handled by __itoa.  */
+/* Signed directives, handled by itoa.  */
 
 static void __attribute__ ((noipa))
 test_itoa (void)
@@ -149,7 +149,7 @@ test_itoa (void)
 #endif
 }
 
-/* Unsigned directives, handled by __utoa.  */
+/* Unsigned directives, handled by utoa.  */
 
 static void __attribute__ ((noipa))
 test_utoa (void)
@@ -192,7 +192,7 @@ test_utoa (void)
 #endif
 }
 
-/* Unknown integers mixed with other directives, so that __itoa and __utoa
+/* Unknown integers mixed with other directives, so that itoa and utoa
    write at an offset into the buffer and their result is used to compute
    where the next directive starts.  */
 

@@ -1,13 +1,18 @@
-/* Verify which sprintf calls with integer directives whose arguments are
-   not known at compile time are folded into calls to the __itoa and __utoa
-   functions emitted by the sprintf pass, and which are left alone.
+/* Verify that sprintf calls with integer directives whose arguments are
+   not known at compile time are folded into calls to the itoa and utoa
+   functions emitted by the sprintf optimizations.  Every translation unit
+   emits its own copy of these functions, so they are only emitted on targets
+   that can merge the copies at link time using weak symbols (such targets also
+   often support COMDAT which the sprintf optimizations also can take advantage
+   of). Calls left alone on all targets are in builtin-sprintf-36.c.
    { dg-do compile }
+   { dg-require-weak "" }
    { dg-options "-O2 -Wno-format -fno-printf-return-value -fdump-tree-optimized" } */
 
 #define sprintf(...) __builtin_sprintf (__VA_ARGS__)
 
-/* Calls expected to be folded.  Signed directives use __itoa and unsigned
-   ones __utoa.  */
+/* Calls expected to be folded.  Signed directives use itoa and unsigned
+   ones utoa.  */
 
 void f_d (char *d, int i)
 {
@@ -79,62 +84,14 @@ int f_mixed_ret (char *d, int i, unsigned u)
   return sprintf (d, "<%d|%u>", i, u);
 }
 
+void f_s_d (char *d, const char *s, int i)
+{
+  sprintf (d, "%s%d", s, i);
+}
+
 void f_d_d (char *d, int i, int j)
 {
   sprintf (d, "%d%d", i, j);
 }
 
-/* Calls expected not to be folded because we don't support these formats
-   so far.  */
-
-void g_x (char *d, int i)
-{
-  sprintf (d, "%x", i);
-}
-
-void g_o (char *d, int i)
-{
-  sprintf (d, "%o", i);
-}
-
-void g_flag_plus (char *d, int i)
-{
-  sprintf (d, "%+d", i);
-}
-
-void g_flag_zero (char *d, int i)
-{
-  sprintf (d, "%05d", i);
-}
-
-void g_width (char *d, int i)
-{
-  sprintf (d, "%5d", i);
-}
-
-void g_width_star (char *d, int w, int i)
-{
-  sprintf (d, "%*d", w, i);
-}
-
-void g_int_prec (char *d, int i)
-{
-  sprintf (d, "%.3d", i);
-}
-
-void g_uint_prec (char *d, unsigned u)
-{
-  sprintf (d, "%.3u", u);
-}
-
-/* One unsupported directive prevents folding the whole call.  */
-
-void g_mixed (char *d, int i, int j)
-{
-  sprintf (d, "%d%x", i, j);
-}
-
-/* __itoa and __utoa are only emitted on targets supporting COMDAT groups,
-   otherwise the f_* functions are not folded.
-   { dg-final { scan-tree-dump-times "sprintf \\(" 9 "optimized" { target comdat_group } } }
-   { dg-final { scan-tree-dump-times "sprintf \\(" 24 "optimized" { target { ! comdat_group } } } } */
+/* { dg-final { scan-tree-dump-not "sprintf \\(" "optimized" } } */
