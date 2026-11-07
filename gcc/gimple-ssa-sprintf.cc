@@ -4370,9 +4370,7 @@ try_substitute_return_value (gimple_stmt_iterator *gsi,
   return removed;
 }
 
-/* Simplify a call to the sprintf builtin with arguments DEST, FMT, and ORIG.
-   ORIG may be null if this is a 2-argument call.  We don't attempt to
-   simplify calls with more than 3 arguments.
+/* Simplify a call to the sprintf builtin.
 
    Return true if simplification was possible, otherwise false.  */
 
