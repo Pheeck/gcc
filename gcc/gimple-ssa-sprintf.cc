@@ -4625,8 +4625,8 @@ gimple_fold_builtin_sprintf (const call_info &info, gimple_stmt_iterator *gsi)
 		       where longs are 32-bits and long longs are 64-bits, like
 		       32-bits x86 (which requires register concatenation for
 		       64-bits operations) or MS-Windows on x86_64.  */
-		    if (TYPE_PRECISION (dirtype) > TYPE_PRECISION
-			(long_integer_type_node))
+		    if (TYPE_PRECISION (dirtype)
+			> TYPE_PRECISION (long_integer_type_node))
 		      return false;
 
 		    tree fn, fn_arg_type;
