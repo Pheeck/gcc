@@ -4616,10 +4616,9 @@ gimple_fold_builtin_sprintf (const call_info &info, gimple_stmt_iterator *gsi)
 		       function itoa or utoa according to sign to build the
 		       string in execution time.  */
 
-		    /* itoa and utoa are emitted in every translation unit
-		       using them and rely on COMDAT groups to be merged at
-		       link time, so do not optimize if the target doesn't
-		       support them.  */
+		    /* We only emit itoa and utoa for targets that support
+		       mechanisms in the linker for merging duplicate
+		       symbols.  */
 		    if (!supports_one_only ())
 		      return false;
 
