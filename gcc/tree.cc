@@ -2676,7 +2676,7 @@ build_string_from_int (int base, tree num)
   size_t size = strlen (dest) + 1;
   tree string = build_string (size, dest);
 
-  /* Make sure it is a array type of SIZE elements.  */
+  /* Make sure it is an array type of SIZE elements.  */
   tree const_char_type = build_qualified_type (char_type_node, TYPE_QUAL_CONST);
   TREE_TYPE (string) = build_array_type_nelts (const_char_type, size);
 
