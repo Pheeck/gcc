@@ -4410,7 +4410,7 @@ gimple_fold_builtin_sprintf (const call_info &info, gimple_stmt_iterator *gsi)
   /* Append the assignment to the beginning of the list.  */
   gimple_seq_add_stmt_without_update (&stmts, assign);
 
-  /* Get the last directive, we can avoid emiting some statements for the last
+  /* Get the last directive, we can avoid emitting some statements for the last
      one.  */
   const directive &last_dir = info.directives.last ();
 
@@ -4423,12 +4423,12 @@ gimple_fold_builtin_sprintf (const call_info &info, gimple_stmt_iterator *gsi)
       if (dir.width[0] >= 0 && dir.width[1] > 0)
 	return false;
 
-      /* In case there is an special flag to it, do not optimize it because
+      /* In case there is a special flag to it, do not optimize it because
 	 we don't support it.  */
       if (dir.have_any_set_flag () == true)
 	return false;
 
-      /* In case of integers, flags if its signed.  */
+      /* In case of integers, flags if it's signed.  */
       bool sign = false;
 
       /* Computed length of the string.  */
@@ -4482,7 +4482,7 @@ gimple_fold_builtin_sprintf (const call_info &info, gimple_stmt_iterator *gsi)
 		  return false; /* Unknown precision, better be safe.  */
 
 		/* In case the format for %s has any length specifier, then
-		   quicky return.  */
+		   quickly return.  */
 		if (dir.modifier != FMT_LEN_none)
 		  return false;
 
@@ -4531,7 +4531,7 @@ gimple_fold_builtin_sprintf (const call_info &info, gimple_stmt_iterator *gsi)
 							precision);
 			/* At a later pass we might find out that the string
 			   length is actually computable in compilation time,
-			   and this can issue an warning on strnlen.  Hence
+			   and this can issue a warning on strnlen.  Hence
 			   disable the warning.  */
 			suppress_warning (strlencall, OPT_Warray_bounds_);
 		      }
