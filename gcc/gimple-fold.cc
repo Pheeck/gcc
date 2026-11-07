@@ -71,6 +71,21 @@ along with GCC; see the file COPYING3.  If not see
 #include "internal-fn.h"
 #include "gimple-range.h"
 
+enum strlen_range_kind {
+  /* Compute the exact constant string length.  */
+  SRK_STRLEN,
+  /* Compute the maximum constant string length.  */
+  SRK_STRLENMAX,
+  /* Compute a range of string lengths bounded by object sizes.  When
+     the length of a string cannot be determined, consider as the upper
+     bound the size of the enclosing object the string may be a member
+     or element of.  Also determine the size of the largest character
+     array the string may refer to.  */
+  SRK_LENRANGE,
+  /* Determine the integer value of the argument (not string length).  */
+  SRK_INT_VALUE
+};
+
 static bool
 get_range_strlen (tree, bitmap, strlen_range_kind, c_strlen_data *, unsigned);
 
@@ -2061,8 +2076,8 @@ get_range_strlen (tree arg, c_strlen_data *pdata, unsigned eltsize)
    unterminated arrays, then bubble up the offending DECL and
    return the maximum size.  Otherwise return NULL.  */
 
-tree
-get_maxval_strlen (tree arg, strlen_range_kind rkind, tree *nonstr /*= NULL*/)
+static tree
+get_maxval_strlen (tree arg, strlen_range_kind rkind, tree *nonstr = NULL)
 {
   /* A non-null NONSTR is meaningless when determining the maximum
      value of an integer ARG.  */
