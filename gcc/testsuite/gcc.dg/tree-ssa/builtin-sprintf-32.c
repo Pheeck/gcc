@@ -1,5 +1,7 @@
 /* Verify which sprintf calls are folded into sequences of memcpy calls
-   and which are left alone.
+   and which are left alone.  Integer directives whose arguments are not
+   known at compile time are tested in builtin-sprintf-35.c and
+   builtin-sprintf-36.c.
    { dg-do compile }
    { dg-options "-O2 -Wno-format -fno-printf-return-value -fdump-tree-optimized" } */
 
@@ -74,11 +76,6 @@ void f_mixed (char *d, const char *s)
 /* Calls expected not to be folded because we don't support these formats so
    far.  */
 
-void g_d_var (char *d, int i)
-{
-  sprintf (d, "%d", i);
-}
-
 void g_width (char *d, const char *s)
 {
   sprintf (d, "%5s", s);
@@ -129,11 +126,6 @@ void g_percent (char *d)
   sprintf (d, "100%%");
 }
 
-void g_mixed_var (char *d, const char *s, int i)
-{
-  sprintf (d, "%s%d", s, i);
-}
-
 /* The length of S is unknown and so is the return value.  */
 
 int g_s_ret (char *d, const char *s)
@@ -141,4 +133,4 @@ int g_s_ret (char *d, const char *s)
   return sprintf (d, "%s", s);
 }
 
-/* { dg-final { scan-tree-dump-times "sprintf \\(" 13 "optimized" } } */
+/* { dg-final { scan-tree-dump-times "sprintf \\(" 11 "optimized" } } */
