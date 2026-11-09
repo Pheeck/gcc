@@ -555,6 +555,9 @@ get_int_range (tree, gimple *, HOST_WIDE_INT *, HOST_WIDE_INT *,
 	       bool, HOST_WIDE_INT, range_query *);
 
 struct call_info;
+struct directive;
+
+static fmtresult format_plain (const directive &, tree, pointer_query &);
 
 /* Description of a format directive.  A directive is either a plain
    string or a conversion specification that starts with '%'.  */
@@ -628,6 +631,16 @@ struct directive
       &= ~(1U << (c % (CHAR_BIT * sizeof *flags)));
   }
 
+  /* Check if there is any set flag.  That means, if the bitfield is != 0.  */
+  bool have_any_set_flag () const
+  {
+    unsigned reduce = 0;
+    for (size_t i = 0; i < ARRAY_SIZE (flags); i++)
+      reduce |= flags[i];
+
+    return reduce;
+  }
+
   /* Set both bounds of the width range to VAL.  */
   void set_width (HOST_WIDE_INT val)
   {
@@ -662,6 +675,27 @@ struct directive
 	     || (unsigned HOST_WIDE_INT)width[1] <= target_int_max ())
 	    && (prec[1] < 0
 		|| (unsigned HOST_WIDE_INT)prec[1] < target_int_max ()));
+  }
+
+  /* Check if the format string is the plain format one, that is without
+     any %.  */
+  inline bool is_plain_format () const
+  {
+    return fmtfunc == format_plain;
+  }
+
+  /* Build a string literal representation of this directive and return a tree
+     node representing a pointer to it.  */
+  inline tree to_string_literal () const
+  {
+    /* Duplicate string to make sure it is \0-terminated.  */
+    char *dup = xstrndup (beg, len);
+
+    /* Create the string tree object.  */
+    tree string = build_string_literal (len + 1, dup);
+
+    free (dup);
+    return string;
   }
 };
 
@@ -898,6 +932,9 @@ struct call_info
   /* Format argument and format string extracted from it.  */
   tree format;
   const char *fmtstr;
+
+  /* Vector of stored directives.  */
+  auto_vec<directive> directives;
 
   /* The location of the format argument.  */
   location_t fmtloc;
@@ -4077,6 +4114,9 @@ compute_format_length (call_info &info, format_result *res,
       if (!format_directive (info, res, dir, ptr_qry))
 	return false;
 
+      /* Remember the directive.  */
+      info.directives.safe_push (dir);
+
       /* Return success when the directive is zero bytes long and it's
 	 the last thing in the format string (i.e., it's the terminating
 	 nul, which isn't really a directive but handling it as one makes
@@ -4294,6 +4334,239 @@ try_substitute_return_value (gimple_stmt_iterator *gsi,
   return removed;
 }
 
+/* Simplify a call to the sprintf builtin with arguments DEST, FMT, and ORIG.
+   ORIG may be null if this is a 2-argument call.  We don't attempt to
+   simplify calls with more than 3 arguments.
+
+   Return true if simplification was possible, otherwise false.  */
+
+static bool
+try_simplify_call_sprintf (const call_info &info, gimple_stmt_iterator *gsi)
+{
+  gimple *stmt = gsi_stmt (*gsi);
+  tree dest = gimple_call_arg (stmt, 0);
+
+  if (!init_target_chars ())
+    return false;
+
+  tree fn_strlen = builtin_decl_implicit (BUILT_IN_STRLEN);
+  tree fn_memcpy = builtin_decl_implicit (BUILT_IN_MEMCPY);
+
+  /* This one may not be available, yet still we can optimize some calls even
+     if this is not present.  */
+  tree fn_strnlen = builtin_decl_explicit (BUILT_IN_STRNLEN);
+
+  if (!gimple_vdef (stmt) && gimple_in_ssa_p (cfun))
+    return false;
+
+  if (!fn_strlen || !fn_memcpy)
+    return false;
+
+  /* Create a list of statements we will append into.  */
+  gimple_seq stmts = NULL;
+
+  /* Create a temporary variable that will point to the beginning of the
+     output sprintf buffer.  */
+  tree char_ptr_type = build_pointer_type (char_type_node);
+  tree head_var = create_tmp_var (char_ptr_type, "head");
+  tree last_head = make_ssa_name (head_var, NULL);
+
+  gassign *assign = gimple_build_assign (last_head, dest);
+
+  /* Append the assignment to the beginning of the list.  */
+  gimple_seq_add_stmt_without_update (&stmts, assign);
+
+  /* Get the last directive, we can avoid emitting some statements for the last
+     one.  */
+  const directive &last_dir = info.directives.last ();
+
+  /* Iterate on every found directive and "compile" into other, cheaper
+     functions if possible.  */
+  for (const directive &dir : info.directives)
+    {
+      /* In case this string has a 'width' value, do not optimize because we
+	 still not support it.  */
+      if (dir.width[0] >= 0 && dir.width[1] > 0)
+	return false;
+
+      /* In case there is a special flag to it, do not optimize it because
+	 we don't support it.  */
+      if (dir.have_any_set_flag () == true)
+	return false;
+
+      /* Computed length of the string.  */
+      tree len = NULL_TREE;
+
+      /* If the format doesn't contain % args or %%, use plain memcpy.  */
+      if (dir.is_plain_format ())
+	{
+	  tree literal = dir.to_string_literal ();
+
+	  size_t dir_len = dir.len;
+
+	  /* Create a tree node with the length of the string.  */
+	  len = build_int_cst (size_type_node, dir_len);
+
+	  /* Convert sprintf (str, fmt) into memcpy (str, fmt, len) when
+	     'format' is known to contain no % formats.  */
+	  gimple *repl = gimple_build_call (fn_memcpy, 3, last_head, literal,
+					    len);
+	  gimple_seq_add_stmt_without_update (&stmts, repl);
+
+	  /* Propagate the NO_WARNING bit to avoid issuing the same
+	     warning more than once.  */
+	  copy_warning (repl, stmt);
+	}
+      else
+	{
+	  /* Now handle the specifiers.  */
+	  switch (dir.specifier)
+	    {
+	    case 's':
+	      {
+		/* Don't crash on sprintf (str1, "%s").  */
+		if (!dir.arg)
+		  return false;
+
+		/* Don't fold calls with source arguments of invalid
+		   (nonpointer) types.  */
+		if (!POINTER_TYPE_P (TREE_TYPE (dir.arg)))
+		  return false;
+
+		/* In case we have a precision, we need to take that into
+		   account.  */
+		if (dir.prec[1] == INT_MAX)
+		  return false; /* Unknown precision, better be safe.  */
+
+		/* In case the format for %s has any length specifier, then
+		   quickly return.  */
+		if (dir.modifier != FMT_LEN_none)
+		  return false;
+
+		/* Check if we can find the length of the string in compilation
+		   time.  */
+		c_strlen_data lendata = { };
+		if (get_range_strlen (dir.arg, &lendata, /*eltsize=*/1)
+		    && TREE_CODE (lendata.maxlen) == INTEGER_CST
+		    && TREE_CODE (lendata.minlen) == INTEGER_CST
+		    && tree_int_cst_equal (lendata.maxlen, lendata.minlen))
+		  {
+		    /* We can.  */
+
+		    /* When there is no precision indicated, prec is -1.  */
+		    HOST_WIDE_INT max = dir.prec[1] < 0 ? INT_MAX : dir.prec[1];
+
+		    /* Clamp the string if the format says so.  */
+		    HOST_WIDE_INT clamped_len = tree_to_shwi (lendata.maxlen);
+		    if (clamped_len > max)
+		      clamped_len = max;
+
+		    /* Now we want the minimum between the string length and
+		       whatever was specified in the precision.  */
+		    tree min = build_int_cst (size_type_node, clamped_len);
+
+		    /* Now we fold it to len.  */
+		    len = fold_convert (sizetype, min);
+		  }
+		else
+		  {
+		    /* We can not.  Create a call to strlen to find the length
+		       of str2.  */
+
+		    gimple *strlencall;
+		    if (dir.prec[1] >= 0)
+		      {
+			/* We need strnlen for this.  */
+			if (!fn_strnlen)
+			  return false;
+
+			/* We have precision.  Set a call to strnlen to account
+			   for that.  */
+			tree precision = build_int_cst (size_type_node,
+							dir.prec[1]);
+			strlencall = gimple_build_call (fn_strnlen, 2, dir.arg,
+							precision);
+			/* At a later pass we might find out that the string
+			   length is actually computable in compilation time,
+			   and this can issue a warning on strnlen.  Hence
+			   disable the warning.  */
+			suppress_warning (strlencall, OPT_Warray_bounds_);
+		      }
+		    else
+		      {
+			/* No precision.  */
+			strlencall = gimple_build_call (fn_strlen, 1, dir.arg);
+		      }
+
+		    len = make_temp_ssa_name (size_type_node, NULL, "");
+		    gimple_call_set_lhs (strlencall, len);
+		    gimple_seq_add_stmt_without_update (&stmts, strlencall);
+		  }
+
+		/* Convert sprintf (str1, "%s", str2) into
+		   memcpy (str1, str2, len).  */
+		gimple *repl = gimple_build_call (fn_memcpy, 3, last_head,
+						  dir.arg, len);
+		gimple_seq_add_stmt_without_update (&stmts, repl);
+
+		/* Propagate the NO_WARNING bit to avoid issuing the same
+		   warning more than once.  */
+		copy_warning (repl, stmt);
+
+		/* In case the user provided us broken strings, make sure that
+		   -Warray-bounds won't issue a new warning.  */
+		suppress_warning (repl, OPT_Warray_bounds_);
+
+		break;
+	      }
+
+	    default:
+	      /* Unsupported directive.  Abort.  */
+	      return false;
+	    }
+	}
+
+      /* Update the head pointer if necessary.  */
+      if (&dir != &last_dir)
+	{
+	  gcc_assert (len != NULL_TREE);
+	  tree new_head = make_ssa_name (SSA_NAME_VAR (last_head), NULL);
+	  gassign *update_head = gimple_build_assign (new_head,
+						      POINTER_PLUS_EXPR,
+						      last_head, len);
+	  gimple_seq_add_stmt_without_update (&stmts, update_head);
+	  last_head = new_head;
+	}
+    }
+
+  /* Compute the return value again.  */
+  if (tree lhs = gimple_call_lhs (stmt))
+    {
+      tree len = make_temp_ssa_name (ptrdiff_type_node, NULL, "len");
+
+      /* The number of written bytes is the difference of whatever is in the
+	 head pointer and the original buffer, buf - head.  */
+      gassign *assign1 = gimple_build_assign (len, POINTER_DIFF_EXPR,
+					      last_head, dest);
+
+      gimple_seq_add_stmt_without_update (&stmts, assign1);
+
+      /* Make sure we match the original return type of sprintf.  */
+      if (!useless_type_conversion_p (TREE_TYPE (lhs), TREE_TYPE (len)))
+	len = fold_convert (TREE_TYPE (lhs), len);
+
+      /* Replace the original call lhs.  */
+      gassign *assign2 = gimple_build_assign (lhs, len);
+
+      gimple_seq_add_stmt_without_update (&stmts, assign2);
+    }
+
+  /* Fold the created list of stmts replacing the original call.  */
+  gsi_replace_with_seq_vops (gsi, stmts);
+
+  return true;
+}
+
 /* Try to simplify a s{,n}printf call described by INFO with result
    RES by replacing it with a simpler and presumably more efficient
    call (such as strcpy).  */
@@ -4313,7 +4586,7 @@ try_simplify_call (gimple_stmt_iterator *gsi,
       return gimple_fold_builtin_snprintf (gsi);
 
     case BUILT_IN_SPRINTF:
-      return gimple_fold_builtin_sprintf (gsi);
+      return try_simplify_call_sprintf (info, gsi);
 
     default:
       ;
