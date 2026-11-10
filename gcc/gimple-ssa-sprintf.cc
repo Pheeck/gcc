@@ -4490,11 +4490,28 @@ try_simplify_call_sprintf (const call_info &info, gimple_stmt_iterator *gsi)
 
 		/* Check if we can find the length of the string in compilation
 		   time.  */
-		c_strlen_data lendata = { };
-		if (get_range_strlen (dir.arg, &lendata, /*eltsize=*/1)
-		    && TREE_CODE (lendata.maxlen) == INTEGER_CST
-		    && TREE_CODE (lendata.minlen) == INTEGER_CST
-		    && tree_int_cst_equal (lendata.maxlen, lendata.minlen))
+		tree strlen_cst = NULL_TREE;
+		if (dir.prec[1] >= 0)
+		  {
+		    /* With a precision, the argument need not be nul-terminated
+		       so we can't use get_range_strlen.  It may determine
+		       the length from the size of the array the argument
+		       points to, assuming it's nul-terminated.  */
+		    strlen_cst = c_strlen (dir.arg, 1);
+		  }
+		else
+		  {
+		    c_strlen_data lendata = { };
+		    if (get_range_strlen (dir.arg, &lendata, /*eltsize=*/1)
+			&& TREE_CODE (lendata.maxlen) == INTEGER_CST
+			&& TREE_CODE (lendata.minlen) == INTEGER_CST
+			&& tree_int_cst_equal (lendata.maxlen, lendata.minlen))
+		      strlen_cst = lendata.maxlen;
+		  }
+
+		if (strlen_cst
+		    && TREE_CODE (strlen_cst) == INTEGER_CST
+		    && tree_fits_shwi_p (strlen_cst))
 		  {
 		    /* We can.  */
 
@@ -4502,7 +4519,7 @@ try_simplify_call_sprintf (const call_info &info, gimple_stmt_iterator *gsi)
 		    HOST_WIDE_INT max = dir.prec[1] < 0 ? INT_MAX : dir.prec[1];
 
 		    /* Clamp the string if the format says so.  */
-		    HOST_WIDE_INT clamped_len = tree_to_shwi (lendata.maxlen);
+		    HOST_WIDE_INT clamped_len = tree_to_shwi (strlen_cst);
 		    if (clamped_len > max)
 		      clamped_len = max;
 
