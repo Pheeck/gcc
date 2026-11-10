@@ -4591,13 +4591,16 @@ gimple_fold_builtin_sprintf (const call_info &info, gimple_stmt_iterator *gsi)
 
 		    /* Build the string.  */
 		    tree str = build_string_from_int (10, dir.arg);
-		    tree addr_str = build1 (ADDR_EXPR,
-					    build_pointer_type (TREE_TYPE (str)),
-					    str);
 
 		    /* Now TREE_STRING_LENGTH returns the SIZE of the string.  So
 		       subtract one so we have its LENGTH.  */
 		    int str_len = TREE_STRING_LENGTH (str) - 1;
+
+		    /* Build a proper string literal (read-only, static) out of
+		       it, the same way as for the plain parts of the format
+		       string.  */
+		    const char *chars = TREE_STRING_POINTER (str);
+		    tree addr_str = build_string_literal (str_len + 1, chars);
 
 		    /* Emit the memcpy.  */
 		    len = build_int_cst (size_type_node, str_len);
