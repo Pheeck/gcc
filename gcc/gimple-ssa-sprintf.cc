@@ -21,21 +21,21 @@ along with GCC; see the file COPYING3.  If not see
 
    1) it analyzes calls to formatted output functions like sprintf looking for
    possible buffer overflows and calls to bounded functions like snprintf for
-   early truncation (and under the control of the -Wformat-length option issues
-   warnings)
+   early truncation (and under the control of the -Wformat-overflow and
+   -Wformat-truncation options issues warnings).
 
    2) under the control of the -fprintf-return-value option it folds the return
    value of safe calls into constants, making it possible to eliminate code
    that depends on the value of those constants.
 
    3) in some cases, it replaces calls to sprintf and similar functions with
-   simpler specialized code
+   simpler specialized code.
 
    For all functions (bounded or not) the analysis in this file uses the size
    of the destination object.  That means that it will diagnose calls to
    snprintf not on the basis of the size specified by the function's second
    argument but rather on the basis of the size the first argument points to
-   (if possible). For bound-checking built-ins like __builtin___snprintf_chk
+   (if possible).  For bound-checking built-ins like __builtin___snprintf_chk
    the analysis uses the size typically determined by __builtin_object_size and
    passed to the built-in by the Glibc inline wrapper.
 
