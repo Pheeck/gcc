@@ -4810,6 +4810,11 @@ build_conversion_fn_decl (const char *name, tree val_type)
      code bloat, make sure all those copies get linked into a single
      instance.  */
   gcc_checking_assert (supports_one_only ());
+  /* make_decl_one_only sets TREE_PUBLIC too but we need it set before
+     computing the assembler name.  Otherwise, with LTO, the name would be
+     made unique by appending a number to it and the copies wouldn't get
+     merged.  */
+  TREE_PUBLIC (fn_decl) = 1;
   make_decl_one_only (fn_decl, DECL_ASSEMBLER_NAME (fn_decl));
 
   DECL_VISIBILITY (fn_decl) = VISIBILITY_HIDDEN;
