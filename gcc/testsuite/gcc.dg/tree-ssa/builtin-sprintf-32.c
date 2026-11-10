@@ -1,7 +1,8 @@
 /* Verify which sprintf calls are folded into sequences of memcpy calls
    and which are left alone.  Integer directives whose arguments are not
-   known at compile time are tested in builtin-sprintf-35.c and
-   builtin-sprintf-36.c.
+   known at compile time are tested in builtin-sprintf-33.c and
+   builtin-sprintf-35.c, except for those left alone on all targets, which
+   are below.
    { dg-do compile }
    { dg-options "-O2 -Wno-format -fno-printf-return-value -fdump-tree-optimized" } */
 
@@ -137,9 +138,32 @@ void g_percent (char *d)
 
 /* The length of S is unknown and so is the return value.  */
 
+/* Integer directives with arguments not known at compile time and with
+   a width, a precision, a flag, or a conversion other than %d, %i and %u.  */
+
+void g_d_var_width (char *d, int i)
+{
+  sprintf (d, "%5d", i);
+}
+
+void g_d_var_prec (char *d, int i)
+{
+  sprintf (d, "%.3d", i);
+}
+
+void g_d_var_flag (char *d, int i)
+{
+  sprintf (d, "%+d", i);
+}
+
+void g_x_var (char *d, unsigned i)
+{
+  sprintf (d, "%x", i);
+}
+
 int g_s_ret (char *d, const char *s)
 {
   return sprintf (d, "%s", s);
 }
 
-/* { dg-final { scan-tree-dump-times "sprintf \\(" 11 "optimized" } } */
+/* { dg-final { scan-tree-dump-times "sprintf \\(" 15 "optimized" } } */

@@ -4,7 +4,7 @@
    emits its own copy of these functions, so they are only emitted on targets
    that can merge the copies at link time using weak symbols (such targets also
    often support COMDAT which the sprintf optimizations also can take advantage
-   of). Calls left alone on all targets are in builtin-sprintf-36.c.
+   of).  Calls left alone on all targets are in builtin-sprintf-32.c.
    { dg-do compile }
    { dg-require-weak "" }
    { dg-options "-O2 -Wno-format -fno-printf-return-value -fdump-tree-optimized" } */
@@ -94,4 +94,7 @@ void f_d_d (char *d, int i, int j)
   sprintf (d, "%d%d", i, j);
 }
 
-/* { dg-final { scan-tree-dump-not "sprintf \\(" "optimized" } } */
+/* On LLP64 targets, size_t is wider than long, which the itoa and utoa
+   functions take, so the %zu call is not folded.  */
+/* { dg-final { scan-tree-dump-not "sprintf \\(" "optimized" { target { ! llp64 } } } } */
+/* { dg-final { scan-tree-dump-times "sprintf \\(" 1 "optimized" { target llp64 } } } */
