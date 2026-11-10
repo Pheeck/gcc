@@ -707,13 +707,17 @@ struct directive
      node representing a pointer to it.  */
   inline tree to_string_literal () const
   {
-    /* Duplicate string to make sure it is \0-terminated.  */
-    char *dup = xstrndup (beg, len);
+    /* Copy the directive and \0-terminate it.  Don't use xstrndup.  The
+       terminating nul of the format string is handled as a directive of
+       length 1 and xstrndup would allocate only a single byte for it.  */
+    char *dup = XNEWVEC (char, len + 1);
+    memcpy (dup, beg, len);
+    dup[len] = '\0';
 
     /* Create the string tree object.  */
     tree string = build_string_literal (len + 1, dup);
 
-    free (dup);
+    XDELETEVEC (dup);
     return string;
   }
 };
