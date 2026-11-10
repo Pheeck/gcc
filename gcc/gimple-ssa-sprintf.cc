@@ -4476,10 +4476,12 @@ try_simplify_call_sprintf (const call_info &info, gimple_stmt_iterator *gsi)
 		if (!POINTER_TYPE_P (TREE_TYPE (dir.arg)))
 		  return false;
 
-		/* In case we have a precision, we need to take that into
-		   account.  */
-		if (dir.prec[1] == INT_MAX)
-		  return false; /* Unknown precision, better be safe.  */
+		/* PREC is the range of the precision.  Only fold when the
+		   precision is known exactly.  This includes PREC being
+		   [-1, -1] when there is no precision or when it is given
+		   by an argument known to be negative.  */
+		if (dir.prec[0] != dir.prec[1])
+		  return false;
 
 		/* In case the format for %s has any length specifier, then
 		   quickly return.  */
