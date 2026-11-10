@@ -4500,10 +4500,7 @@ try_simplify_call_sprintf (const call_info &info, gimple_stmt_iterator *gsi)
 
 		    /* Now we want the minimum between the string length and
 		       whatever was specified in the precision.  */
-		    tree min = build_int_cst (size_type_node, clamped_len);
-
-		    /* Now we fold it to len.  */
-		    len = fold_convert (sizetype, min);
+		    len = build_int_cst (size_type_node, clamped_len);
 		  }
 		else
 		  {
@@ -4595,7 +4592,7 @@ try_simplify_call_sprintf (const call_info &info, gimple_stmt_iterator *gsi)
 		    int str_len = TREE_STRING_LENGTH (str) - 1;
 
 		    /* Emit the memcpy.  */
-		    len = build_int_cst (sizetype, str_len);
+		    len = build_int_cst (size_type_node, str_len);
 		    gimple *repl = gimple_build_call (fn_memcpy, 3, last_head,
 						      addr_str, len);
 		    gimple_seq_add_stmt_without_update (&stmts, repl);
@@ -4689,10 +4686,13 @@ try_simplify_call_sprintf (const call_info &info, gimple_stmt_iterator *gsi)
       if (&dir != &last_dir)
 	{
 	  gcc_assert (len != NULL_TREE);
+	  /* LEN has type size_t but POINTER_PLUS_EXPR needs sizetype.  These
+	     may have different precision.  */
+	  tree off = gimple_convert (&stmts, sizetype, len);
 	  tree new_head = make_ssa_name (SSA_NAME_VAR (last_head), NULL);
 	  gassign *update_head = gimple_build_assign (new_head,
 						      POINTER_PLUS_EXPR,
-						      last_head, len);
+						      last_head, off);
 	  gimple_seq_add_stmt_without_update (&stmts, update_head);
 	  last_head = new_head;
 	}
@@ -5001,7 +5001,7 @@ build_itoa_utoa_fn (bool sign)
       tree str_3_2
 	= gimple_build (&gsi, false, GSI_NEW_STMT, UNKNOWN_LOCATION,
 			POINTER_PLUS_EXPR, str_type, str_3_1,
-			build_one_cst (size_type_node));
+			size_one_node);
       gsi_insert_after (&gsi, minus_write, GSI_NEW_STMT);
 
       /* bb4 (apply absolute value):
@@ -5061,7 +5061,7 @@ build_itoa_utoa_fn (bool sign)
 		    build_int_cst (long_unsigned_type_node, 10));
   tree str_5_2
     = gimple_build (&seq, POINTER_PLUS_EXPR, str_type, str_5_1,
-		    build_one_cst (size_type_node));
+		    size_one_node);
   gcond *bb5_cond
     = gimple_build_cond (GT_EXPR, val_5_1,
 			 build_int_cst (long_unsigned_type_node, 9), NULL,
