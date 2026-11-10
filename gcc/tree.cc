@@ -2653,8 +2653,15 @@ build_string_from_int (int base, tree num)
   switch (base)
     {
     case 10:
-      print_dec (value, dest, sign);
-      break;
+      {
+	/* BUF is too small for constants with a large precision, such as
+	   those of wide _BitInt types.  */
+	unsigned len;
+	if (print_dec_buf_size (value, sign, &len))
+	  dest = XALLOCAVEC (char, len);
+	print_dec (value, dest, sign);
+	break;
+      }
 
     /* If we wanted, we could support base 16 like this:
     case 16:
@@ -16874,6 +16881,33 @@ test_predicates ()
   ASSERT_FALSE (uniform_integer_cst_p (c_f_m1));
 }
 
+/* Check that build_string_from_int works correctly.  */
+
+static void
+test_build_string_from_int (void)
+{
+  tree str = build_string_from_int (10, build_int_cst (integer_type_node,
+							-42));
+  ASSERT_EQ (TREE_STRING_LENGTH (str), 4);
+  ASSERT_STREQ (TREE_STRING_POINTER (str), "-42");
+
+  str = build_string_from_int (10, build_int_cst (unsigned_type_node, 7));
+  ASSERT_EQ (TREE_STRING_LENGTH (str), 2);
+  ASSERT_STREQ (TREE_STRING_POINTER (str), "7");
+
+  /* A constant with more digits than fit WIDE_INT_PRINT_BUFFER_SIZE.  */
+  struct bitint_info info;
+  if (!targetm.c.bitint_type_info (1024, &info))
+    return;
+  tree type = build_bitint_type (1024, 1);
+  tree num = wide_int_to_tree (type, wi::max_value (1024, UNSIGNED));
+  str = build_string_from_int (10, num);
+  /* 2^1024 - 1 has 309 decimal digits.  */
+  ASSERT_EQ (TREE_STRING_LENGTH (str), 310);
+  ASSERT_EQ (strncmp (TREE_STRING_POINTER (str), "179769313486", 12), 0);
+  ASSERT_EQ (strcmp (TREE_STRING_POINTER (str) + 303, "137215"), 0);
+}
+
 /* Check that string escaping works correctly.  */
 
 static void
@@ -16930,6 +16964,7 @@ tree_cc_tests ()
   test_location_wrappers ();
   test_predicates ();
   test_escaped_strings ();
+  test_build_string_from_int ();
 }
 
 } // namespace selftest
