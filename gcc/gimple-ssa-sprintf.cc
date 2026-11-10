@@ -95,6 +95,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "cgraph.h"
 #include "cfghooks.h"
 #include "tree-into-ssa.h"
+#include "opts.h"
 
 /* The likely worst case value of MB_LEN_MAX for the target, large enough
    for UTF-8.  Ideally, this would be obtained by a target hook if it were
@@ -4375,6 +4376,67 @@ try_substitute_return_value (gimple_stmt_iterator *gsi,
   return removed;
 }
 
+/* Return true if the target option NAME, such as "mabi=", was specified on
+   the command line.  Return false if the target has no such option.  */
+
+static bool
+target_option_specified_p (const char *name)
+{
+  size_t idx = find_opt (name, CL_TARGET);
+  if (idx == OPT_SPECIAL_unknown || !(cl_options[idx].flags & CL_TARGET))
+    return false;
+
+  const cl_option *option = &cl_options[idx];
+  void *set_var = option_flag_var (idx, &global_options_set);
+  if (!set_var)
+    /* We can't tell.  Be conservative.  */
+    return true;
+
+  switch (option->var_type)
+    {
+    case CLVC_BIT_SET:
+    case CLVC_BIT_CLEAR:
+      if (option->cl_host_wide_int)
+	return (*(HOST_WIDE_INT *) set_var & option->var_value) != 0;
+      return (*(int *) set_var & option->var_value) != 0;
+
+    case CLVC_STRING:
+      return *(const char **) set_var != NULL;
+
+    case CLVC_ENUM:
+      return cl_enums[option->var_enum].get (set_var) != 0;
+
+    default:
+      if (option->cl_host_wide_int)
+	return *(HOST_WIDE_INT *) set_var != 0;
+      return *(int *) set_var != 0;
+    }
+}
+
+/* The itoa and utoa functions are emitted into each translation unit using
+   them and the linker keeps only one of the copies.  Return true if
+   the options affecting their behavior or calling convention have their
+   default values, so that the copies are interchangeable with those
+   emitted into other translation units.  */
+
+static bool
+itoa_utoa_options_default_p ()
+{
+  /* The functions write the sign and the digits in the execution character
+     set (-fexec-charset).  */
+  for (const char *p = "-0123456789"; *p; p++)
+    if (lang_hooks.to_target_charset (*p) != *p)
+      return false;
+
+  /* Target options affecting the calling convention.  */
+  static const char *const abi_options[] = { "mregparm=", "mrtd", "mabi=" };
+  for (const char *name : abi_options)
+    if (target_option_specified_p (name))
+      return false;
+
+  return true;
+}
+
 /* Simplify a call to the sprintf builtin.
 
    Return true if simplification was possible, otherwise false.  */
@@ -4685,6 +4747,12 @@ gimple_fold_builtin_sprintf (const call_info &info, gimple_stmt_iterator *gsi)
 		       mechanisms in the linker for merging duplicate
 		       symbols.  */
 		    if (!supports_one_only ())
+		      goto fail;
+
+		    /* Don't use the functions unless they are guaranteed to be
+		       interchangeable with the copies emitted into other
+		       translation units.  */
+		    if (!itoa_utoa_options_default_p ())
 		      goto fail;
 
 		    /* If it requires more precision than what we support, then
