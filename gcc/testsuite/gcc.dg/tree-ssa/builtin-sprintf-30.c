@@ -290,6 +290,9 @@ test_unhandled (int i, int w)
   TV ("[   ab]", "[%*s]", w, "ab");
   TV ("   42", "%*d", w, 42);
   TV ("   he", "%*.2s", w, "hello");
+
+  /* Handled using the itoa and utoa functions on targets that support
+     them.  */
   TV ("3", "%d", i);
   TV ("x3", "%s%d", "x", i);
   TV ("3x", "%d%s", i, "x");
