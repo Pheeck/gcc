@@ -76,12 +76,12 @@ void f_zu (char *d, __SIZE_TYPE__ u)
 
 void f_mixed (char *d, const char *s, int i, unsigned u)
 {
-  sprintf (d, "%d:%s:%u", i, s, u);
+  sprintf (d, "%d:%s%u", i, s, u);
 }
 
 int f_mixed_ret (char *d, int i, unsigned u)
 {
-  return sprintf (d, "<%d|%u>", i, u);
+  return sprintf (d, "<%d|%u", i, u);
 }
 
 void f_s_d (char *d, const char *s, int i)
