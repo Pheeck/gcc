@@ -4595,6 +4595,10 @@ try_simplify_call_sprintf (const call_info &info, gimple_stmt_iterator *gsi)
 		    gimple *repl = gimple_build_call (fn_memcpy, 3, last_head,
 						      addr_str, len);
 		    gimple_seq_add_stmt_without_update (&stmts, repl);
+
+		    /* Propagate the NO_WARNING bit to avoid issuing the same
+		       warning more than once.  */
+		    copy_warning (repl, stmt);
 		  }
 		else
 		  {
