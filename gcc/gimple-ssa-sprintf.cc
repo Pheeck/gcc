@@ -4380,6 +4380,11 @@ try_simplify_call_sprintf (const call_info &info, gimple_stmt_iterator *gsi)
   gimple *stmt = gsi_stmt (*gsi);
   tree dest = gimple_call_arg (stmt, 0);
 
+  /* gsi_replace_with_seq_vops sets the location of the new statements to
+     LOC.  But warning dispositions are tracked per location so we need to
+     set it on the statements before changing them.  */
+  location_t loc = gimple_location (stmt);
+
   if (!init_target_chars ())
     return false;
 
@@ -4448,6 +4453,7 @@ try_simplify_call_sprintf (const call_info &info, gimple_stmt_iterator *gsi)
 	     'format' is known to contain no % formats.  */
 	  gimple *repl = gimple_build_call (fn_memcpy, 3, last_head, literal,
 					    len);
+	  gimple_set_location (repl, loc);
 	  gimple_seq_add_stmt_without_update (&stmts, repl);
 
 	  /* Propagate the NO_WARNING bit to avoid issuing the same
@@ -4520,6 +4526,7 @@ try_simplify_call_sprintf (const call_info &info, gimple_stmt_iterator *gsi)
 							dir.prec[1]);
 			strlencall = gimple_build_call (fn_strnlen, 2, dir.arg,
 							precision);
+			gimple_set_location (strlencall, loc);
 			/* At a later pass we might find out that the string
 			   length is actually computable in compilation time,
 			   and this can issue a warning on strnlen.  Hence
@@ -4541,6 +4548,7 @@ try_simplify_call_sprintf (const call_info &info, gimple_stmt_iterator *gsi)
 		   memcpy (str1, str2, len).  */
 		gimple *repl = gimple_build_call (fn_memcpy, 3, last_head,
 						  dir.arg, len);
+		gimple_set_location (repl, loc);
 		gimple_seq_add_stmt_without_update (&stmts, repl);
 
 		/* Propagate the NO_WARNING bit to avoid issuing the same
@@ -4595,6 +4603,7 @@ try_simplify_call_sprintf (const call_info &info, gimple_stmt_iterator *gsi)
 		    len = build_int_cst (size_type_node, str_len);
 		    gimple *repl = gimple_build_call (fn_memcpy, 3, last_head,
 						      addr_str, len);
+		    gimple_set_location (repl, loc);
 		    gimple_seq_add_stmt_without_update (&stmts, repl);
 
 		    /* Propagate the NO_WARNING bit to avoid issuing the same
