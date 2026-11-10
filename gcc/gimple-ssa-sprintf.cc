@@ -4406,6 +4406,12 @@ gimple_fold_builtin_sprintf (const call_info &info, gimple_stmt_iterator *gsi)
   if (!fn_strlen || !fn_memcpy)
     return false;
 
+  /* Each directive, including the plain parts of the format string and its
+     terminating nul, is replaced by one or more statements.  Don't replace
+     calls with many directives by long sequences of statements.  */
+  if (info.directives.length () > 5)
+    return false;
+
   /* Create a list of statements we will append into.  */
   gimple_seq stmts = NULL;
 
