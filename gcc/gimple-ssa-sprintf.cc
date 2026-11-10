@@ -4412,6 +4412,18 @@ gimple_fold_builtin_sprintf (const call_info &info, gimple_stmt_iterator *gsi)
   if (info.directives.length () > 5)
     return false;
 
+  /* When optimizing for size, only fold calls with no directives other than
+     the plain parts of the format string or with a single %s directive.
+     Folding other calls typically increases code size.  */
+  if (optimize_function_for_size_p (cfun))
+    {
+      unsigned nconversions = 0;
+      for (const directive &dir : info.directives)
+	if (!dir.is_plain_format ()
+	    && (++nconversions > 1 || dir.specifier != 's'))
+	  return false;
+    }
+
   /* Create a list of statements we will append into.  */
   gimple_seq stmts = NULL;
 
