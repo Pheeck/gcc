@@ -4596,10 +4596,21 @@ try_simplify_call_sprintf (const call_info &info, gimple_stmt_iterator *gsi)
 		       subtract one so we have its LENGTH.  */
 		    int str_len = TREE_STRING_LENGTH (str) - 1;
 
+		    /* The string is in the host character set.  Convert it to
+		       the execution character set.  */
+		    const char *host_chars = TREE_STRING_POINTER (str);
+		    char *chars = XALLOCAVEC (char, str_len + 1);
+		    for (int i = 0; i < str_len; i++)
+		      {
+			chars[i] = lang_hooks.to_target_charset (host_chars[i]);
+			if (!chars[i])
+			  return false;
+		      }
+		    chars[str_len] = '\0';
+
 		    /* Build a proper string literal (read-only, static) out of
 		       it, the same way as for the plain parts of the format
 		       string.  */
-		    const char *chars = TREE_STRING_POINTER (str);
 		    tree addr_str = build_string_literal (str_len + 1, chars);
 
 		    /* Emit the memcpy.  */
