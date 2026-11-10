@@ -4382,9 +4382,9 @@ gimple_fold_builtin_sprintf (const call_info &info, gimple_stmt_iterator *gsi)
   tree fn_strlen = builtin_decl_implicit (BUILT_IN_STRLEN);
   tree fn_memcpy = builtin_decl_implicit (BUILT_IN_MEMCPY);
 
-  /* This one may not be available, yet still we can optimize some calls even
-     if this is not present.  */
-  tree fn_strnlen = builtin_decl_explicit (BUILT_IN_STRNLEN);
+  /* strnlen is not part of ISO C so the target C library may not provide
+     it.  We can still optimize the calls that don't need it.  */
+  tree fn_strnlen = builtin_decl_implicit (BUILT_IN_STRNLEN);
 
   if (!gimple_vdef (stmt) && gimple_in_ssa_p (cfun))
     return false;

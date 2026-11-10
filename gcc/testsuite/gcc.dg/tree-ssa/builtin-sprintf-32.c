@@ -9,6 +9,15 @@ typedef __SIZE_TYPE__ size_t;
 
 #define sprintf(...) __builtin_sprintf (__VA_ARGS__)
 
+/* strnlen is not an ISO C function.  GCC only emits calls to it when the
+   program declares and uses it.  */
+size_t strnlen (const char *, size_t);
+
+size_t use_strnlen (const char *s)
+{
+  return strnlen (s, 4);
+}
+
 /* Calls expected to be folded.  */
 
 void f_plain (char *d)
