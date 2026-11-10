@@ -115,10 +115,15 @@ namespace {
 
 static int warn_level;
 
-/* Emit utoa and itoa functions that convert unsigned and signed integers to
-   string in runtime.  */
+/* Return the decl of the itoa (SIGN true) or utoa (SIGN false) function that
+   converts signed or unsigned integers to string at run time.  */
 
-static tree build_itoa_utoa_fn (bool sign);
+static tree get_itoa_utoa_decl (bool sign);
+
+/* Emit the body of the itoa (SIGN true) or utoa (SIGN false) function unless
+   it has already been emitted.  */
+
+static void emit_itoa_utoa_body (bool sign);
 
 /* Emitted utoa and itoa functions in the translation unit.  Should survive
    while the pass executes.  */
@@ -4404,11 +4409,10 @@ gimple_fold_builtin_sprintf (const call_info &info, gimple_stmt_iterator *gsi)
   /* Create a list of statements we will append into.  */
   gimple_seq stmts = NULL;
 
-  /* Create a temporary variable that will point to the beginning of the
-     output sprintf buffer.  */
+  /* Create a temporary that will point to the beginning of the output
+     sprintf buffer.  */
   tree char_ptr_type = build_pointer_type (char_type_node);
-  tree head_var = create_tmp_var (char_ptr_type, "head");
-  tree last_head = make_ssa_name (head_var, NULL);
+  tree last_head = make_temp_ssa_name (char_ptr_type, NULL, "head");
 
   gassign *assign = gimple_build_assign (last_head, dest);
 
@@ -4419,6 +4423,10 @@ gimple_fold_builtin_sprintf (const call_info &info, gimple_stmt_iterator *gsi)
      one.  */
   const directive &last_dir = info.directives.last ();
 
+  /* Set when the itoa or utoa function is used.  */
+  bool use_itoa = false;
+  bool use_utoa = false;
+
   /* Iterate on every found directive and "compile" into other, cheaper
      functions if possible.  */
   for (const directive &dir : info.directives)
@@ -4426,12 +4434,12 @@ gimple_fold_builtin_sprintf (const call_info &info, gimple_stmt_iterator *gsi)
       /* In case this string has a 'width' value, do not optimize because we
 	 still not support it.  */
       if (dir.width[0] >= 0 && dir.width[1] > 0)
-	return false;
+	goto fail;
 
       /* In case there is a special flag to it, do not optimize it because
 	 we don't support it.  */
       if (dir.have_any_set_flag () == true)
-	return false;
+	goto fail;
 
       /* In case of integers, flags if it's signed.  */
       bool sign = false;
@@ -4469,24 +4477,24 @@ gimple_fold_builtin_sprintf (const call_info &info, gimple_stmt_iterator *gsi)
 	      {
 		/* Don't crash on sprintf (str1, "%s").  */
 		if (!dir.arg)
-		  return false;
+		  goto fail;
 
 		/* Don't fold calls with source arguments of invalid
 		   (nonpointer) types.  */
 		if (!POINTER_TYPE_P (TREE_TYPE (dir.arg)))
-		  return false;
+		  goto fail;
 
 		/* PREC is the range of the precision.  Only fold when the
 		   precision is known exactly.  This includes PREC being
 		   [-1, -1] when there is no precision or when it is given
 		   by an argument known to be negative.  */
 		if (dir.prec[0] != dir.prec[1])
-		  return false;
+		  goto fail;
 
 		/* In case the format for %s has any length specifier, then
 		   quickly return.  */
 		if (dir.modifier != FMT_LEN_none)
-		  return false;
+		  goto fail;
 
 		/* Check if we can find the length of the string in compilation
 		   time.  */
@@ -4537,7 +4545,7 @@ gimple_fold_builtin_sprintf (const call_info &info, gimple_stmt_iterator *gsi)
 		      {
 			/* We need strnlen for this.  */
 			if (!fn_strnlen)
-			  return false;
+			  goto fail;
 
 			/* We have precision.  Set a call to strnlen to account
 			   for that.  */
@@ -4590,21 +4598,21 @@ gimple_fold_builtin_sprintf (const call_info &info, gimple_stmt_iterator *gsi)
 	      {
 		/* Don't crash on sprintf (str1, "%u").  */
 		if (!dir.arg)
-		  return false;
+		  goto fail;
 
 		/* Don't fold calls with arguments of invalid (non-integer)
 		   types.  */
 		tree argtype = TREE_TYPE (dir.arg);
 		if (!INTEGRAL_TYPE_P (argtype))
-		  return false;
+		  goto fail;
 
 		/* If user specified a precision then let's not optimize it.  */
 		if (dir.prec[1] >= 0)
-		  return false;
+		  goto fail;
 
 		tree dirtype = get_type_tree_for_integer (sign, dir);
 		if (dirtype == NULL_TREE)
-		  return false;
+		  goto fail;
 
 		if (TREE_CODE (dir.arg) == INTEGER_CST)
 		  {
@@ -4612,7 +4620,7 @@ gimple_fold_builtin_sprintf (const call_info &info, gimple_stmt_iterator *gsi)
 
 		    /* In case the value doesn't fit, give up.  */
 		    if (!int_fits_type_p (dir.arg, dirtype))
-		      return false;
+		      goto fail;
 
 		    /* Build the string.  */
 		    tree str = build_string_from_int (10, dir.arg);
@@ -4629,7 +4637,7 @@ gimple_fold_builtin_sprintf (const call_info &info, gimple_stmt_iterator *gsi)
 		      {
 			chars[i] = lang_hooks.to_target_charset (host_chars[i]);
 			if (!chars[i])
-			  return false;
+			  goto fail;
 		      }
 		    chars[str_len] = '\0';
 
@@ -4659,7 +4667,7 @@ gimple_fold_builtin_sprintf (const call_info &info, gimple_stmt_iterator *gsi)
 		       mechanisms in the linker for merging duplicate
 		       symbols.  */
 		    if (!supports_one_only ())
-		      return false;
+		      goto fail;
 
 		    /* If it requires more precision than what we support, then
 		       do not optimize.  This happens for example in platforms
@@ -4668,7 +4676,7 @@ gimple_fold_builtin_sprintf (const call_info &info, gimple_stmt_iterator *gsi)
 		       64-bits operations) or MS-Windows on x86_64.  */
 		    if (TYPE_PRECISION (dirtype)
 			> TYPE_PRECISION (long_integer_type_node))
-		      return false;
+		      goto fail;
 
 		    /* _BitInt arguments wider than long have already been
 		       lowered by now, so we can't emit a conversion from
@@ -4676,26 +4684,17 @@ gimple_fold_builtin_sprintf (const call_info &info, gimple_stmt_iterator *gsi)
 		    if (TREE_CODE (argtype) == BITINT_TYPE
 			&& (TYPE_PRECISION (argtype)
 			    > TYPE_PRECISION (long_integer_type_node)))
-		      return false;
+		      goto fail;
 
-		    tree fn, fn_arg_type;
+		    /* Use itoa for %d and utoa for %u.  Their bodies are only
+		       emitted once we know the whole call can be folded.  */
+		    tree fn = get_itoa_utoa_decl (sign);
+		    tree fn_arg_type = (sign ? long_integer_type_node
+					: long_unsigned_type_node);
 		    if (sign)
-		      {
-			/* %d case.  Emit itoa.  */
-			if (itoa_fn == NULL_TREE)
-			  itoa_fn = build_itoa_utoa_fn (true);
-			fn = itoa_fn;
-			fn_arg_type = long_integer_type_node;
-		      }
+		      use_itoa = true;
 		    else
-		      {
-			/* %u case.  Emit utoa.  */
-			if (utoa_fn == NULL_TREE)
-			  utoa_fn = build_itoa_utoa_fn (false);
-
-			fn = utoa_fn;
-			fn_arg_type = long_unsigned_type_node;
-		      }
+		      use_utoa = true;
 
 		    /* Do casting to the argument to the directive first to
 		       ensure truncation.  For example, for %hhd directive
@@ -4734,7 +4733,7 @@ gimple_fold_builtin_sprintf (const call_info &info, gimple_stmt_iterator *gsi)
 
 	    default:
 	      /* Unsupported directive.  Abort.  */
-	      return false;
+	      goto fail;
 	    }
 	}
 
@@ -4745,7 +4744,7 @@ gimple_fold_builtin_sprintf (const call_info &info, gimple_stmt_iterator *gsi)
 	  /* LEN has type size_t but POINTER_PLUS_EXPR needs sizetype.  These
 	     may have different precision.  */
 	  tree off = gimple_convert (&stmts, sizetype, len);
-	  tree new_head = make_ssa_name (SSA_NAME_VAR (last_head), NULL);
+	  tree new_head = make_temp_ssa_name (char_ptr_type, NULL, "head");
 	  gassign *update_head = gimple_build_assign (new_head,
 						      POINTER_PLUS_EXPR,
 						      last_head, off);
@@ -4753,6 +4752,12 @@ gimple_fold_builtin_sprintf (const call_info &info, gimple_stmt_iterator *gsi)
 	  last_head = new_head;
 	}
     }
+
+  /* All directives are supported.  Emit the helpers that are used.  */
+  if (use_itoa)
+    emit_itoa_utoa_body (true);
+  if (use_utoa)
+    emit_itoa_utoa_body (false);
 
   /* Compute the return value again.  */
   if (tree lhs = gimple_call_lhs (stmt))
@@ -4780,6 +4785,12 @@ gimple_fold_builtin_sprintf (const call_info &info, gimple_stmt_iterator *gsi)
   gsi_replace_with_seq_vops (gsi, stmts);
 
   return true;
+
+ fail:
+  /* Release the statements built so far along with the SSA names they
+     define.  */
+  gimple_seq_discard (stmts);
+  return false;
 }
 
 /* Try to simplify a s{,n}printf call described by INFO with result
@@ -4866,17 +4877,6 @@ build_conversion_fn_decl (const char *name, tree val_type)
   /* Like the sprintf call it replaces, the function never throws.  */
   TREE_NOTHROW (fn_decl) = 1;
 
-  /* Every translation unit using the function emits its own copy.  To avoid
-     code bloat, make sure all those copies get linked into a single
-     instance.  */
-  gcc_checking_assert (supports_one_only ());
-  /* make_decl_one_only sets TREE_PUBLIC too but we need it set before
-     computing the assembler name.  Otherwise, with LTO, the name would be
-     made unique by appending a number to it and the copies wouldn't get
-     merged.  */
-  TREE_PUBLIC (fn_decl) = 1;
-  make_decl_one_only (fn_decl, DECL_ASSEMBLER_NAME (fn_decl));
-
   DECL_VISIBILITY (fn_decl) = VISIBILITY_HIDDEN;
   DECL_VISIBILITY_SPECIFIED (fn_decl) = 1;
 
@@ -4911,8 +4911,24 @@ build_conversion_fn_decl (const char *name, tree val_type)
   return fn_decl;
 }
 
-/* Emit an 'itoa' (SIGN true) or 'utoa' (SIGN false) function for the
-   target.
+/* Return the decl of the itoa (SIGN true) or utoa (SIGN false) function,
+   building it if needed.  This only builds the decl.  The body is emitted
+   by emit_itoa_utoa_body.  */
+
+static tree
+get_itoa_utoa_decl (bool sign)
+{
+  tree &fn_decl = sign ? itoa_fn : utoa_fn;
+  if (fn_decl == NULL_TREE)
+    {
+      tree val_type = sign ? long_integer_type_node : long_unsigned_type_node;
+      fn_decl = build_conversion_fn_decl (sign ? "itoa" : "utoa", val_type);
+    }
+  return fn_decl;
+}
+
+/* Emit the body of the 'itoa' (SIGN true) or 'utoa' (SIGN false) function
+   for the target unless it has already been emitted.
 
    Given an unsigned long number and a string buffer, the 'utoa' function
    fills out the buffer with the decimal string representation of that number.
@@ -4921,11 +4937,26 @@ build_conversion_fn_decl (const char *name, tree val_type)
    'itoa' has an extra bb2-bb4 prologue that writes a sign and computes the
    absolute value; bb5-bb8 are shared between both.  */
 
-static tree
-build_itoa_utoa_fn (bool sign)
+static void
+emit_itoa_utoa_body (bool sign)
 {
-  tree val_type = sign ? long_integer_type_node : long_unsigned_type_node;
-  tree fn_decl = build_conversion_fn_decl (sign ? "itoa" : "utoa", val_type);
+  tree fn_decl = get_itoa_utoa_decl (sign);
+
+  /* The body has already been emitted.  */
+  if (DECL_STRUCT_FUNCTION (fn_decl))
+    return;
+
+  /* Every translation unit using the function emits its own copy.  To avoid
+     code bloat, make sure all those copies get linked into a single
+     instance.  */
+  gcc_checking_assert (supports_one_only ());
+  /* make_decl_one_only sets TREE_PUBLIC too but we need it set before
+     computing the assembler name.  Otherwise, with LTO, the name would be
+     made unique by appending a number to it and the copies wouldn't get
+     merged.  */
+  TREE_PUBLIC (fn_decl) = 1;
+  make_decl_one_only (fn_decl, DECL_ASSEMBLER_NAME (fn_decl));
+
   tree str_param_decl = DECL_ARGUMENTS (fn_decl);
   tree str_type = TREE_TYPE (str_param_decl);
   tree val_param_decl = DECL_CHAIN (str_param_decl);
@@ -5209,8 +5240,6 @@ build_itoa_utoa_fn (bool sign)
 
   /* Update call graph.  */
   cgraph_node::add_new_function (fn_decl, true);
-
-  return fn_decl;
 }
 
 }   /* Unnamed namespace.  */
