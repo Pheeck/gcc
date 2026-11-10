@@ -4803,6 +4803,9 @@ build_conversion_fn_decl (const char *name, tree val_type)
   DECL_IGNORED_P (fn_decl) = 1;
   DECL_DECLARED_INLINE_P (fn_decl) = 1;
 
+  /* Like the sprintf call it replaces, the function never throws.  */
+  TREE_NOTHROW (fn_decl) = 1;
+
   /* Every translation unit using the function emits its own copy.  To avoid
      code bloat, make sure all those copies get linked into a single
      instance.  */
