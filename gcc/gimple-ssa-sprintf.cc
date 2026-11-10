@@ -4573,6 +4573,12 @@ try_simplify_call_sprintf (const call_info &info, gimple_stmt_iterator *gsi)
 		if (!dir.arg)
 		  return false;
 
+		/* Don't fold calls with arguments of invalid (non-integer)
+		   types.  */
+		tree argtype = TREE_TYPE (dir.arg);
+		if (!INTEGRAL_TYPE_P (argtype))
+		  return false;
+
 		/* If user specified a precision then let's not optimize it.  */
 		if (dir.prec[1] >= 0)
 		  return false;
@@ -4643,6 +4649,14 @@ try_simplify_call_sprintf (const call_info &info, gimple_stmt_iterator *gsi)
 		       64-bits operations) or MS-Windows on x86_64.  */
 		    if (TYPE_PRECISION (dirtype)
 			> TYPE_PRECISION (long_integer_type_node))
+		      return false;
+
+		    /* _BitInt arguments wider than long have already been
+		       lowered by now, so we can't emit a conversion from
+		       them.  */
+		    if (TREE_CODE (argtype) == BITINT_TYPE
+			&& (TYPE_PRECISION (argtype)
+			    > TYPE_PRECISION (long_integer_type_node)))
 		      return false;
 
 		    tree fn, fn_arg_type;
